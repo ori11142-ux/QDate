@@ -173,14 +173,14 @@ async function main() {
 
   header('Message-event + feedback loop');
   await recordMessageEvent({
-    matchId: String(match._id),
-    senderId: String(user._id),
+    matchId: match._id,
+    senderId: user._id,
     messageLength: 42,
     responseTimeSeconds: 320,
   });
   await recordFeedback({
-    matchId: String(match._id),
-    userId: String(user._id),
+    matchId: match._id,
+    userId: user._id,
     willingnessToMeet: 5,
     communicationCompatibility: 4,
   });
