@@ -6,6 +6,11 @@ export type CreateUserInput = {
   name: string;
   age: number;
   authMethod: 'email' | 'apple';
+  gender?: 'man' | 'woman' | null;
+  attraction?: 'men' | 'women' | 'both' | null;
+  photoUrl?: string | null;
+  interestTags?: string[];
+  appearanceTags?: string[];
   profile: {
     intent: 'long_term' | 'casual' | 'explore' | 'friendship';
     sharedIntellectImportance: number;

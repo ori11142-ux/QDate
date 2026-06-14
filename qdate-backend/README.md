@@ -1,6 +1,13 @@
 # QDate Backend
 
-Node.js + Express + MongoDB backend for QDate. This iteration ships the **data layer** — schemas, services, seed/verify scripts, and a minimal Express server exposing enough endpoints to prove everything works end-to-end. Full REST surface (the contracts in the mobile app's `src/api.ts`) comes next.
+Node.js + Express + MongoDB backend for QDate.
+
+## Architecture reconciliation (from `Finals project Architecture report-1.pdf`)
+
+- **Implemented exactly**: 14-day learning phase with daily matching, then Phase 2 weekly curated matching with cooldown penalties on curated skips; behavioral learning from message cadence/latency and calibration swipes; feedback loop for post-match learning.
+- **Implemented with stack-aligned adaptation**: the report describes a future Python + pgvector service. This repo currently uses TypeScript + MongoDB, so the ranker is implemented as an explainable TypeScript ML module (`src/ml/*`) that learns adaptive weights from in-app outcomes/feedback and can be replaced later by the dedicated ML service.
+- **Scale profiles idea**: calibration cards now include structured metadata tags (interests + looks decks). Swipe likes/dislikes (weighted by response time) are converted into taste vectors.
+- **Ethics**: appearance taste is modeled only through abstract calibration tags and optional candidate `appearanceTags`; no inference of protected attributes from photos.
 
 ## Stack
 
@@ -122,7 +129,30 @@ Per the mobile design, the interests deck and looks deck are deliberately uncorr
 | swipes | `userId` | User's swipe history |
 | swipes | `userId, mode, swipedAt -1` (compound) | Per-mode history with recency |
 
-## API (current surface)
+## ML matching pipeline
+
+### Features extracted per user (`src/ml/features.ts`)
+
+- Messaging behavior: average + median reply latency, message frequency/day, average message length, average read latency.
+- Activity-time profile: normalized morning/afternoon/evening/night activity buckets.
+- Stated profile: intent, communication style, intellect-importance, age, intent score.
+- Calibration taste vectors: interests + looks vectors from swipes, using `responseTimeMs` as confidence.
+- Feedback signal: average willingness-to-meet + communication-compatibility ratings.
+
+### Ranker (`src/ml/ranker.ts`)
+
+- `scoreCandidate(requester, candidate)` remains 0–100 and deterministic.
+- Matching generation uses `scoreCandidateWithLearning` (adaptive weighted model) for candidate ranking.
+- Training signal comes from match outcomes (`connected` vs `skipped/expired`) and explicit feedback.
+- Phase 2 curation applies a higher score threshold before surfacing a weekly match.
+
+### Phase logic
+
+- Phase 1: up to day 14 (`LEARNING_DAYS`) daily matching.
+- Phase 2: one curated match per week, higher quality threshold, `isIntentionalPairing=true`.
+- Curated skip applies cooldown (`cooldownUntil`) for 14 days.
+
+## API
 
 | Method | Path | What it does |
 |---|---|---|
@@ -136,20 +166,17 @@ Per the mobile design, the interests deck and looks deck are deliberately uncorr
 | POST | `/api/messages/match/:matchId/mark-read` | Mark unread messages from the other party |
 | POST | `/api/swipes` | Record a calibration swipe |
 | GET  | `/api/swipes/:userId?mode=interests\|looks` | List a user's swipes |
+| POST | `/api/analytics/message_event` | Record message telemetry + update intent score |
+| POST | `/api/learning/feedback` | Record post-match feedback + update intent score |
+| GET  | `/api/calibration/interests/:userId` | Interests calibration deck (with tags) |
+| GET  | `/api/calibration/looks/:userId` | Looks calibration deck (with tags) |
+| GET  | `/api/match/weekly_curated/:userId` | Weekly curated Phase 2 match |
+| POST | `/api/match/daily_generate` | Daily Phase 1 match |
 
-## What's TODO for the full API
+## Remaining TODO
 
-The mobile app's `src/api.ts` expects these endpoints. We need to add them next iteration:
-
-- `POST /api/auth/register` — full onboarding payload, returns user + token
-- `POST /api/match/daily_generate` — Phase 1 match creation
-- `GET /api/match/weekly_curated/:userId` — Phase 2 fetch
-- `POST /api/analytics/message_event` — currently we accept message contents; the mobile sends event metadata. Either merge or keep parallel.
-- `POST /api/learning/feedback` — post-skip feedback (need to add `feedback` model)
-- `GET /api/insights/:userId` — aggregations the ML pipeline owns
-- `GET /api/calibration/interests/:userId` and `/calibration/looks/:userId` — deck delivery
-
-Also missing: authentication middleware. Right now any caller can write any user's data. Once Firebase Auth is wired, every route needs a `verifyToken` middleware that pulls the verified uid from the request.
+- Auth middleware (Firebase token verification) is still pending.
+- Future roadmap from architecture doc (Python supervised service + vector DB + clustering) remains a later migration path.
 
 ## A note for the ML lead
 

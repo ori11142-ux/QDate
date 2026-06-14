@@ -46,8 +46,8 @@ function resolveBackendHost(): string {
 
 const API_BASE = `${resolveBackendHost()}/api`;
 
-// Set false once match/insights/swipe endpoints are wired on the backend.
-const USE_MOCK_API = true;
+// Backend now supports match/insights/learning/calibration endpoints.
+const USE_MOCK_API = false;
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;

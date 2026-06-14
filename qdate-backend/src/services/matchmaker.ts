@@ -1,10 +1,13 @@
 import { Types } from 'mongoose';
 import { UserDoc, UserModel } from '../models/User';
 import { MatchDoc, MatchModel } from '../models/Match';
+import { scoreCandidateHeuristicML, scoreCandidateWithLearning } from '../ml/ranker';
 
 type Phase = 'phase_1' | 'phase_2';
 
 const LEARNING_DAYS = 14;
+const PHASE2_CADENCE_DAYS = 7;
+const PHASE2_QUALITY_THRESHOLD = 72;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
@@ -13,33 +16,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * same output range, so the endpoint contract doesn't change when ML lands.
  */
 export function scoreCandidate(requester: UserDoc, candidate: UserDoc): number {
-  const rp = requester.profile;
-  const cp = candidate.profile;
-  if (!rp || !cp) return 0;
-
-  let score = 0;
-
-  // Shared intent is the strongest signal — both want the same kind of thing.
-  if (rp.intent === cp.intent) {
-    score += 40;
-  }
-
-  // Shared communication style.
-  if (rp.commStyle === cp.commStyle) {
-    score += 25;
-  }
-
-  // Age proximity: full marks if same age, decaying ~2 pts per year apart.
-  const ageDiff = Math.abs(requester.age - candidate.age);
-  score += Math.max(0, 20 - ageDiff * 2);
-
-  // Similar weighting of shared intellect (both value it similarly).
-  const intellectDiff = Math.abs(
-    rp.sharedIntellectImportance - cp.sharedIntellectImportance
-  );
-  score += Math.max(0, 15 - intellectDiff * 3);
-
-  return score;
+  return scoreCandidateHeuristicML(requester, candidate);
 }
 
 /**
@@ -98,7 +75,9 @@ function genderCompatible(a: UserDoc, b: UserDoc): boolean {
   return aWantsB && bWantsA;
 }
 
-export async function findBestCandidate(requester: UserDoc): Promise<UserDoc | null> {
+async function findBestCandidateWithScore(
+  requester: UserDoc
+): Promise<{ candidate: UserDoc; score: number } | null> {
   const excludedIds: Types.ObjectId[] = [requester._id as Types.ObjectId];
 
   // Everyone currently busy in a pairing (one-at-a-time applies to candidates
@@ -120,13 +99,19 @@ export async function findBestCandidate(requester: UserDoc): Promise<UserDoc | n
   let best: UserDoc | null = null;
   let bestScore = -1;
   for (const c of eligible) {
-    const s = scoreCandidate(requester, c);
+    const s = await scoreCandidateWithLearning(requester, c);
     if (s > bestScore) {
       bestScore = s;
       best = c;
     }
   }
-  return best;
+  if (!best) return null;
+  return { candidate: best, score: bestScore };
+}
+
+export async function findBestCandidate(requester: UserDoc): Promise<UserDoc | null> {
+  const best = await findBestCandidateWithScore(requester);
+  return best?.candidate ?? null;
 }
 
 export type GeneratedMatch = {
@@ -163,8 +148,40 @@ export async function generateMatchForUser(
     // Candidate vanished (deleted) — fall through and make a new match.
   }
 
-  const candidate = await findBestCandidate(requester);
-  if (!candidate) return null;
+  const inLearning = learningDay(requester) < LEARNING_DAYS;
+  if (phase === 'phase_1' && !inLearning) {
+    await UserModel.updateOne({ _id: requester._id }, { currentPhase: 'phase_2' });
+    return null;
+  }
+
+  if (phase === 'phase_2') {
+    const cooldownUntil = requester.get('cooldownUntil') as Date | null | undefined;
+    if (cooldownUntil && cooldownUntil.getTime() > Date.now()) {
+      return null;
+    }
+    if (inLearning) {
+      return null;
+    }
+    const lastPhase2 = await MatchModel.findOne({
+      userId: requester._id,
+      phase: 'phase_2',
+    }).sort({ createdAt: -1 });
+    if (
+      lastPhase2 &&
+      Date.now() - new Date(lastPhase2.createdAt).getTime() <
+        PHASE2_CADENCE_DAYS * DAY_MS
+    ) {
+      return null;
+    }
+  }
+
+  const best = await findBestCandidateWithScore(requester);
+  if (!best) return null;
+
+  const { candidate, score: learnedScore } = best;
+  if (phase === 'phase_2' && learnedScore < PHASE2_QUALITY_THRESHOLD) {
+    return null;
+  }
 
   const isPhase2 = phase === 'phase_2';
   const expiresAt = new Date(Date.now() + (isPhase2 ? 7 * DAY_MS : DAY_MS));
@@ -204,7 +221,13 @@ export async function generateMatchForUser(
 /**
  * Map a match + its candidate into the shape the mobile app's `Match` type expects.
  */
-export function toClientMatch(match: MatchDoc, candidate: UserDoc) {
+export function toClientMatch(
+  match: MatchDoc,
+  candidate: UserDoc,
+  opts?: { cooldownUntil?: Date | null }
+) {
+  const cooldownUntil = opts?.cooldownUntil ?? null;
+  const cooldownActive = cooldownUntil ? cooldownUntil.getTime() > Date.now() : false;
   return {
     matchId: String(match._id),
     status: match.status,
@@ -217,6 +240,6 @@ export function toClientMatch(match: MatchDoc, candidate: UserDoc) {
     dayInLearningPeriod: match.dayInLearningPeriod ?? undefined,
     totalLearningDays: match.phase === 'phase_1' ? LEARNING_DAYS : undefined,
     isIntentionalPairing: match.isIntentionalPairing ?? undefined,
-    cooldownActive: false,
+    cooldownActive,
   };
 }

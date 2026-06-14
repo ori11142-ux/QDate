@@ -118,7 +118,6 @@ Auth wiring (when ready):
 - Lottie animations during loading states
 - Push notifications via `expo-notifications`
 
-**Out of scope until backend is real:**
+**Out of scope until backend is real-time:**
 - Real-time chat (currently auto-replies from a canned pool)
 - Live charts on Insights with actual data
-- Calibration / "scale profiles" idea from the architecture doc

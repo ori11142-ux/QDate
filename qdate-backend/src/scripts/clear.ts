@@ -14,21 +14,26 @@ import { UserModel } from '../models/User';
 import { MatchModel } from '../models/Match';
 import { MessageModel } from '../models/Message';
 import { SwipeModel } from '../models/Swipe';
+import { FeedbackModel } from '../models/Feedback';
+import { MessageEventModel } from '../models/MessageEvent';
 
 async function main() {
   await connectToDb();
 
   console.log('[clear] wiping all collections…');
-  const [u, m, msg, s] = await Promise.all([
+  const [u, m, msg, s, f, me] = await Promise.all([
     UserModel.deleteMany({}),
     MatchModel.deleteMany({}),
     MessageModel.deleteMany({}),
     SwipeModel.deleteMany({}),
+    FeedbackModel.deleteMany({}),
+    MessageEventModel.deleteMany({}),
   ]);
 
   console.log(
     `[clear] deleted ${u.deletedCount} users, ${m.deletedCount} matches, ` +
-      `${msg.deletedCount} messages, ${s.deletedCount} swipes.`
+      `${msg.deletedCount} messages, ${s.deletedCount} swipes, ` +
+      `${f.deletedCount} feedback entries, ${me.deletedCount} message events.`
   );
 
   await disconnectFromDb();

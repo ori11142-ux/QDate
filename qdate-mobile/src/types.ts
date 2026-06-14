@@ -70,6 +70,7 @@ export interface InterestCard {
   icon: string;
   label: string;
   description: string;
+  tags?: string[];
 }
 
 export interface LookCard {
@@ -77,6 +78,7 @@ export interface LookCard {
   photoUrl: string;
   name: string;
   age: number;
+  tags?: string[];
 }
 
 export interface CalibrationSwipe {

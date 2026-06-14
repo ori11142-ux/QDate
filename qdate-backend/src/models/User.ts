@@ -40,6 +40,11 @@ const userSchema = new Schema(
     currentPhase: { type: String, enum: PHASES, default: 'phase_1' },
     intentScore: { type: Number, min: 0, max: 10, default: 5 },
     lastActiveAt: { type: Date, default: () => new Date() },
+    cooldownUntil: { type: Date, default: null },
+
+    // Optional structured tags used by the matching model.
+    interestTags: { type: [String], default: [] },
+    appearanceTags: { type: [String], default: [] },
   },
   { timestamps: true }
 );

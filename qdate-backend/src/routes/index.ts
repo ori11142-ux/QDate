@@ -29,6 +29,12 @@ import {
   toClientMatch,
 } from '../services/matchmaker';
 import { computeInsights } from '../services/insights';
+import { recordMessageEvent, recordFeedback } from '../services/learning';
+import {
+  getInterestCalibrationDeck,
+  getLookCalibrationDeck,
+} from '../services/calibration';
+import { UserModel } from '../models/User';
 
 export const router = Router();
 
@@ -151,7 +157,12 @@ router.post('/match/daily_generate', async (req, res) => {
       res.status(404).json({ error: 'No candidates available right now' });
       return;
     }
-    res.json(toClientMatch(result.match, result.candidate));
+    const requester = await UserModel.findById(userId).select('cooldownUntil');
+    res.json(
+      toClientMatch(result.match, result.candidate, {
+        cooldownUntil: requester?.get('cooldownUntil') as Date | null | undefined,
+      })
+    );
   } catch (e: any) {
     res.status(400).json({ error: e?.message ?? 'Failed to generate match' });
   }
@@ -165,7 +176,12 @@ router.get('/match/weekly_curated/:userId', async (req, res) => {
       res.status(404).json({ error: 'No candidates available right now' });
       return;
     }
-    res.json(toClientMatch(result.match, result.candidate));
+    const requester = await UserModel.findById(req.params.userId).select('cooldownUntil');
+    res.json(
+      toClientMatch(result.match, result.candidate, {
+        cooldownUntil: requester?.get('cooldownUntil') as Date | null | undefined,
+      })
+    );
   } catch (e: any) {
     res.status(400).json({ error: e?.message ?? 'Failed to generate match' });
   }
@@ -193,6 +209,10 @@ router.post('/match/:matchId/skip', async (req, res) => {
   } else {
     await markSkipped(match._id);
   }
+  if (match.phase === 'phase_2' && match.isIntentionalPairing) {
+    const cooldownUntil = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+    await UserModel.updateOne({ _id: match.userId }, { cooldownUntil });
+  }
   res.json({ ok: true });
 });
 
@@ -201,6 +221,9 @@ router.post('/match/:matchId/connect', async (req, res) => {
   if (!match) {
     res.status(404).json({ error: 'Match not found' });
     return;
+  }
+  if (match.phase === 'phase_2') {
+    await UserModel.updateOne({ _id: match.userId }, { cooldownUntil: null });
   }
   res.json(match.toJSON());
 });
@@ -279,6 +302,73 @@ router.get('/insights/:userId', async (req, res) => {
     res.json(summary);
   } catch (e: any) {
     res.status(400).json({ error: e?.message ?? 'Failed to compute insights' });
+  }
+});
+
+// ─── Learning and analytics ───────────────────────────────────────────────────
+
+router.post('/analytics/message_event', async (req, res) => {
+  try {
+    const { matchId, senderId, messageLength, responseTimeSeconds } = req.body;
+    if (
+      !matchId ||
+      !senderId ||
+      typeof messageLength !== 'number' ||
+      typeof responseTimeSeconds !== 'number'
+    ) {
+      res.status(400).json({
+        error: 'matchId, senderId, messageLength, responseTimeSeconds are required',
+      });
+      return;
+    }
+    await recordMessageEvent({ matchId, senderId, messageLength, responseTimeSeconds });
+    res.json({ intent_score_updated: true });
+  } catch (e: any) {
+    res.status(400).json({ error: e?.message ?? 'Failed to record message event' });
+  }
+});
+
+router.post('/learning/feedback', async (req, res) => {
+  try {
+    const { matchId, userId, willingnessToMeet, communicationCompatibility } = req.body;
+    if (
+      !matchId ||
+      !userId ||
+      typeof willingnessToMeet !== 'number' ||
+      typeof communicationCompatibility !== 'number'
+    ) {
+      res.status(400).json({
+        error: 'matchId, userId, willingnessToMeet, communicationCompatibility are required',
+      });
+      return;
+    }
+    await recordFeedback({
+      matchId,
+      userId,
+      willingnessToMeet,
+      communicationCompatibility,
+    });
+    res.json({ accepted: true });
+  } catch (e: any) {
+    res.status(400).json({ error: e?.message ?? 'Failed to submit feedback' });
+  }
+});
+
+router.get('/calibration/interests/:userId', async (req, res) => {
+  try {
+    const cards = await getInterestCalibrationDeck(req.params.userId);
+    res.json(cards);
+  } catch (e: any) {
+    res.status(400).json({ error: e?.message ?? 'Failed to load interests deck' });
+  }
+});
+
+router.get('/calibration/looks/:userId', async (req, res) => {
+  try {
+    const cards = await getLookCalibrationDeck(req.params.userId);
+    res.json(cards);
+  } catch (e: any) {
+    res.status(400).json({ error: e?.message ?? 'Failed to load looks deck' });
   }
 });
 

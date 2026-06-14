@@ -26,11 +26,16 @@ import {
   getAvgResponseTimeSeconds,
 } from '../services/messages';
 import { recordSwipe, getLikeRates } from '../services/swipes';
+import { recordFeedback, recordMessageEvent } from '../services/learning';
+import { extractUserFeatures } from '../ml/features';
+import { scoreCandidateWithLearning } from '../ml/ranker';
 
 import { UserModel } from '../models/User';
 import { MatchModel } from '../models/Match';
 import { MessageModel } from '../models/Message';
 import { SwipeModel } from '../models/Swipe';
+import { FeedbackModel } from '../models/Feedback';
+import { MessageEventModel } from '../models/MessageEvent';
 
 function header(label: string) {
   console.log('\n' + '─'.repeat(60));
@@ -47,6 +52,8 @@ async function main() {
     matches: await MatchModel.countDocuments(),
     messages: await MessageModel.countDocuments(),
     swipes: await SwipeModel.countDocuments(),
+    feedback: await FeedbackModel.countDocuments(),
+    messageEvents: await MessageEventModel.countDocuments(),
   });
 
   header('CREATE a fresh test user');
@@ -62,6 +69,9 @@ async function main() {
       commStyle: 'texting_first',
     },
   });
+  user.set('interestTags', ['intellectual_curiosity', 'creative_arts']);
+  user.set('appearanceTags', ['polished_style', 'confident_presence']);
+  await user.save();
   console.log('created user', { id: user.id, email: user.email });
 
   header('READ user back by email');
@@ -80,6 +90,24 @@ async function main() {
       commStyle: 'texting_first',
     },
   });
+  candidate.set('interestTags', ['intellectual_curiosity', 'creative_arts']);
+  candidate.set('appearanceTags', ['polished_style', 'confident_presence']);
+  await candidate.save();
+
+  const incompatible = await createUser({
+    email: `verify-incompatible-${Date.now()}@qdate.app`,
+    name: 'Incompatible User',
+    age: 42,
+    authMethod: 'apple',
+    profile: {
+      intent: 'casual',
+      sharedIntellectImportance: 1,
+      commStyle: 'meet_in_person',
+    },
+  });
+  incompatible.set('interestTags', ['adventure', 'active_lifestyle']);
+  incompatible.set('appearanceTags', ['natural_style', 'outdoor_energy']);
+  await incompatible.save();
   const match = await createMatch({
     userId: user._id,
     candidateUserId: candidate._id,
@@ -143,6 +171,39 @@ async function main() {
   const likeRates = await getLikeRates(user._id);
   console.log('like rates by mode', likeRates);
 
+  header('Message-event + feedback loop');
+  await recordMessageEvent({
+    matchId: String(match._id),
+    senderId: String(user._id),
+    messageLength: 42,
+    responseTimeSeconds: 320,
+  });
+  await recordFeedback({
+    matchId: String(match._id),
+    userId: String(user._id),
+    willingnessToMeet: 5,
+    communicationCompatibility: 4,
+  });
+  const afterLearning = await UserModel.findById(user._id).select('intentScore');
+  console.log('intent score after learning events', afterLearning?.intentScore);
+
+  header('ML feature extraction + ranking sanity check');
+  const features = await extractUserFeatures(user);
+  console.log('features snapshot', {
+    messageFrequencyPerDay: features.messageFrequencyPerDay,
+    avgMessageLength: features.avgMessageLength,
+    interestsPreference: features.interestsPreference,
+    looksPreference: features.looksPreference,
+  });
+  const compatibleScore = await scoreCandidateWithLearning(user, candidate);
+  const incompatibleScore = await scoreCandidateWithLearning(user, incompatible);
+  console.log('compatibility scores', { compatibleScore, incompatibleScore });
+  if (compatibleScore <= incompatibleScore) {
+    throw new Error(
+      `Expected compatible pair to score higher, got ${compatibleScore} <= ${incompatibleScore}`
+    );
+  }
+
   header('UPDATE user phase');
   await setUserPhase(user._id, 'phase_2');
   await touchLastActive(user._id);
@@ -156,9 +217,12 @@ async function main() {
   await Promise.all([
     UserModel.deleteOne({ _id: user._id }),
     UserModel.deleteOne({ _id: candidate._id }),
+    UserModel.deleteOne({ _id: incompatible._id }),
     MatchModel.deleteOne({ _id: match._id }),
     MessageModel.deleteMany({ matchId: match._id }),
     SwipeModel.deleteMany({ userId: user._id }),
+    FeedbackModel.deleteMany({ userId: user._id }),
+    MessageEventModel.deleteMany({ senderId: user._id }),
   ]);
   console.log('cleaned up.');
 
