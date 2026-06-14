@@ -8,6 +8,7 @@
     "start": "node dist/index.js",
     "build": "tsc",
     "seed": "tsx src/scripts/seed.ts",
+    "clear": "tsx src/scripts/clear.ts",
     "verify": "tsx src/scripts/verify.ts"
   },
   "dependencies": {

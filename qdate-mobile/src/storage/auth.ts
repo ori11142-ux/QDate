@@ -2,14 +2,17 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthMethod } from '../navigation/RootNavigator';
 import { IntentProfile, Phase } from '../types';
 
-const KEY = 'qdate.user.v2'; // bumped from v1 — schema now includes `id`
+const KEY = 'qdate.user.v2';
 
 export interface StoredUser {
-  id: string; // real MongoDB _id from the backend
+  id: string;
   name: string;
   email: string;
   age: number;
   authMethod: AuthMethod;
+  photoUrl: string | null;
+  gender: 'man' | 'woman' | null;
+  attraction: 'men' | 'women' | 'both' | null;
   profile: IntentProfile;
   currentPhase: Phase;
   registeredAt: string;
@@ -27,6 +30,9 @@ export async function loadUser(): Promise<StoredUser | null> {
       email: parsed.email ?? '',
       age: parsed.age ?? 0,
       authMethod: parsed.authMethod ?? 'email',
+      photoUrl: parsed.photoUrl ?? null,
+      gender: parsed.gender ?? null,
+      attraction: parsed.attraction ?? null,
       profile: parsed.profile ?? {
         intent: 'long_term',
         sharedIntellectImportance: 3,

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { CompositeScreenProps } from '@react-navigation/native';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
@@ -6,6 +6,8 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  Image,
+  Pressable,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -32,7 +34,7 @@ type Props = CompositeScreenProps<
   NativeStackScreenProps<RootStackParamList>
 >;
 
-type Stage = 'loading' | 'mystery' | 'revealed' | 'closed';
+type Stage = 'loading' | 'mystery' | 'revealed' | 'closed' | 'unavailable';
 
 const PHASE_CONFIG: Record<
   Phase,
@@ -86,38 +88,54 @@ export function DailyFocusScreen({ navigation }: Props) {
   const [nextMatchAt, setNextMatchAt] = useState<string | null>(null);
   const [actionInFlight, setActionInFlight] = useState(false);
   const [cooldownModalOpen, setCooldownModalOpen] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const profileOpacity = useRef(new Animated.Value(0)).current;
   const profileTranslate = useRef(new Animated.Value(20)).current;
 
-  useEffect(() => {
-    let active = true;
+  const loadMatch = useCallback(() => {
     setStage('loading');
     setMatch(null);
     setNextMatchAt(null);
+    setLoadError(null);
 
     const fetcher =
       phase === 'phase_2'
         ? api.getWeeklyCuratedMatch(userId)
         : api.generateDailyMatch(userId);
 
-    fetcher
+    return fetcher
       .then((m) => {
-        if (!active) return;
         setMatch(m);
-        setStage('mystery');
-        profileOpacity.setValue(0);
-        profileTranslate.setValue(20);
+        if (m.status === 'connected' || m.status === 'active') {
+          // Already revealed (or chat already opened) — show the profile
+          // directly instead of replaying the mystery reveal.
+          setStage('revealed');
+          profileOpacity.setValue(1);
+          profileTranslate.setValue(0);
+        } else {
+          setStage('mystery');
+          profileOpacity.setValue(0);
+          profileTranslate.setValue(20);
+        }
       })
-      .catch((e) => active && Alert.alert('Could not load match', String(e)));
+      .catch((e) => {
+        // Don't leave the screen spinning forever — show the reason + a retry.
+        setLoadError(String(e?.message ?? e));
+        setStage('unavailable');
+      });
+  }, [phase, userId, profileOpacity, profileTranslate]);
 
-    return () => {
-      active = false;
-    };
-  }, [phase]);
+  useEffect(() => {
+    loadMatch();
+  }, [loadMatch]);
 
   function handleRevealComplete() {
     setStage('revealed');
+    // Tell the backend the match was revealed (status → active). Fire-and-forget.
+    if (match) {
+      api.revealMatch(match.matchId).catch((e) => console.warn('reveal failed', e));
+    }
     Animated.parallel([
       Animated.timing(profileOpacity, {
         toValue: 1,
@@ -134,7 +152,12 @@ export function DailyFocusScreen({ navigation }: Props) {
 
   function handleOpenChat() {
     if (!match) return;
-    navigation.navigate('Chat', { matchId: match.matchId });
+    navigation.navigate('Chat', {
+      matchId: match.matchId,
+      conversationId: match.conversationId,
+      candidateName: match.candidateName,
+      candidatePhotoUrl: match.candidatePhotoUrl,
+    });
   }
 
   function handleSkipPressed() {
@@ -150,28 +173,42 @@ export function DailyFocusScreen({ navigation }: Props) {
     setCooldownModalOpen(false);
     setActionInFlight(true);
     try {
-      await api.submitFeedback({
-        matchId: match.matchId,
-        userId,
-        willingnessToMeet: 1,
-        communicationCompatibility: 1,
-      });
+      // Close this match on the backend (status → skipped) so the next
+      // generate picks a new candidate.
+      await api.skipMatch(match.matchId);
       // Both phases: next match arrives in 24h after a skip.
       // (Phase 2 specifically: skipping = back to daily for the next cycle.)
       const next = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
       setNextMatchAt(next);
       setStage('closed');
     } catch (e) {
-      Alert.alert('Could not submit', String(e));
+      Alert.alert('Could not skip', String(e));
     } finally {
       setActionInFlight(false);
     }
   }
 
-  if (stage === 'loading' || !match) {
+  if (stage === 'loading') {
     return (
       <SafeAreaView style={[styles.safe, styles.center]}>
         <ActivityIndicator color={colors.primary} />
+      </SafeAreaView>
+    );
+  }
+
+  if (stage === 'unavailable' || !match) {
+    return (
+      <SafeAreaView style={[styles.safe, styles.center]}>
+        <View style={styles.unavailableCard}>
+          <Text style={styles.unavailableSymbol}>◔</Text>
+          <Text style={styles.unavailableTitle}>No match right now</Text>
+          <Text style={styles.unavailableBody}>
+            {loadError ?? 'We couldn\'t load a match. Please try again.'}
+          </Text>
+          <Pressable onPress={() => loadMatch()} style={styles.retryBtn}>
+            <Text style={styles.retryLabel}>Try again</Text>
+          </Pressable>
+        </View>
       </SafeAreaView>
     );
   }
@@ -226,6 +263,14 @@ export function DailyFocusScreen({ navigation }: Props) {
           >
             <View style={styles.card}>
               <View style={styles.photo}>
+                {match.candidatePhotoUrl ? (
+                  <Image
+                    source={{ uri: match.candidatePhotoUrl }}
+                    style={styles.photoImage}
+                  />
+                ) : (
+                  <Text style={styles.photoInitial}>{match.candidateName[0]}</Text>
+                )}
                 <View style={styles.timerOverlay}>
                   <CountdownTimer expiresAt={match.expiresAt} compact />
                 </View>
@@ -234,7 +279,6 @@ export function DailyFocusScreen({ navigation }: Props) {
                     <Text style={styles.intentBadgeText}>✦ Curated</Text>
                   </View>
                 )}
-                <Text style={styles.photoInitial}>{match.candidateName[0]}</Text>
               </View>
               <View style={styles.cardBody}>
                 <Text style={styles.name}>
@@ -293,6 +337,27 @@ const styles = StyleSheet.create({
   scroll: { padding: spacing.lg, paddingBottom: spacing.xxl, flexGrow: 1 },
   center: { alignItems: 'center', justifyContent: 'center' },
 
+  unavailableCard: {
+    alignItems: 'center',
+    paddingHorizontal: spacing.xl,
+    gap: spacing.sm,
+  },
+  unavailableSymbol: { fontSize: 48, color: colors.primaryLight, marginBottom: spacing.sm },
+  unavailableTitle: { ...typography.title, color: colors.text, textAlign: 'center' },
+  unavailableBody: {
+    ...typography.body,
+    color: colors.textMuted,
+    textAlign: 'center',
+    marginBottom: spacing.md,
+  },
+  retryBtn: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: radius.pill,
+  },
+  retryLabel: { ...typography.body, color: colors.textInverse, fontWeight: '600' },
+
   header: { marginBottom: spacing.lg },
   headerTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   h1: { ...typography.display, color: colors.text, flex: 1 },
@@ -337,6 +402,11 @@ const styles = StyleSheet.create({
     fontSize: 96,
     color: colors.primaryLight,
     fontWeight: '300',
+  },
+  photoImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
   },
   timerOverlay: { position: 'absolute', top: spacing.md, right: spacing.md },
   intentBadge: {

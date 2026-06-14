@@ -82,3 +82,49 @@ export async function countMessagesForUserInLastDays(
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
   return MessageModel.countDocuments({ senderId, sentAt: { $gte: since } });
 }
+
+// ─── Conversation-based chat (mutual pairings share a conversationId) ─────────
+
+export type RecordConversationMessageInput = {
+  conversationId: string;
+  senderId: string | Types.ObjectId;
+  text: string;
+};
+
+/**
+ * Persist a message in a shared conversation. Computes response latency relative
+ * to the most recent message from the OTHER participant.
+ */
+export async function recordConversationMessage(
+  input: RecordConversationMessageInput
+): Promise<MessageDoc> {
+  const { conversationId, senderId, text } = input;
+
+  const lastFromOther = await MessageModel.findOne({
+    conversationId,
+    senderId: { $ne: senderId },
+  })
+    .sort({ sentAt: -1 })
+    .select('sentAt');
+
+  const now = new Date();
+  const responseTimeSeconds = lastFromOther
+    ? Math.max(0, Math.floor((now.getTime() - lastFromOther.sentAt.getTime()) / 1000))
+    : null;
+
+  return MessageModel.create({
+    conversationId,
+    senderId,
+    text,
+    messageLength: text.length,
+    responseTimeSeconds,
+    sentAt: now,
+  });
+}
+
+export async function listConversationMessages(
+  conversationId: string,
+  limit = 500
+): Promise<MessageDoc[]> {
+  return MessageModel.find({ conversationId }).sort({ sentAt: 1 }).limit(limit);
+}

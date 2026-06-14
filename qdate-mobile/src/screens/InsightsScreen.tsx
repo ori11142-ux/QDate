@@ -15,27 +15,31 @@ import { useAuth } from '../auth/AuthContext';
 import { InsightsSummary } from '../types';
 import { colors, radius, spacing, typography } from '../theme';
 
-
 export function InsightsScreen() {
   const { user, signOut, togglePhase } = useAuth();
   const [insights, setInsights] = useState<InsightsSummary | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.getInsights(user?.id ?? "").then(setInsights).catch(() => setInsights(null));
-  }, []);
+    let active = true;
+    api
+      .getInsights(user?.id ?? '')
+      .then((d) => active && setInsights(d))
+      .catch(() => active && setInsights(null))
+      .finally(() => active && setLoading(false));
+    return () => {
+      active = false;
+    };
+  }, [user?.id]);
 
   function handleSignOutPress() {
-    Alert.alert(
-      'Sign out?',
-      'You\'ll need to register again to receive matches.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Sign out', style: 'destructive', onPress: () => signOut() },
-      ],
-    );
+    Alert.alert('Sign out?', "You'll need to register again to receive matches.", [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Sign out', style: 'destructive', onPress: () => signOut() },
+    ]);
   }
 
-  if (!insights) {
+  if (loading) {
     return (
       <SafeAreaView style={[styles.safe, styles.center]}>
         <ActivityIndicator color={colors.primary} />
@@ -48,75 +52,114 @@ export function InsightsScreen() {
       ? 'Switch to Phase 2 (demo)'
       : 'Switch to Phase 1 (demo)';
 
+  const o = insights?.matchOutcomes ?? {
+    connected: 0,
+    skipped: 0,
+    expired: 0,
+    pendingOrActive: 0,
+  };
+  const matchTotal = o.connected + o.skipped + o.expired + o.pendingOrActive;
+  const pct = (n: number) => (matchTotal > 0 ? Math.round((100 * n) / matchTotal) : 0);
+
+  const interestsPct =
+    insights?.calibration.interests != null
+      ? Math.round(insights.calibration.interests * 100)
+      : null;
+  const looksPct =
+    insights?.calibration.looks != null
+      ? Math.round(insights.calibration.looks * 100)
+      : null;
+
+  const avgReply =
+    insights?.avgReplyTimeHours != null ? `${insights.avgReplyTimeHours.toFixed(1)}h` : '—';
+
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <Text style={styles.h1}>Insights & Reflection</Text>
         <Text style={styles.subtitle}>
-          {user ? `${user.name}, here's what the system is learning.` : 'How the system is learning your intent'}
+          {user
+            ? `${user.name}, here's what the system is learning.`
+            : 'How the system is learning your intent'}
         </Text>
 
-        <Text style={styles.sectionTitle}>Compatibility Metrics</Text>
+        <Text style={styles.sectionTitle}>Your Activity</Text>
         <View style={styles.metricRow}>
           <View style={styles.metricCard}>
-            <Text style={styles.metricLabel}>Communication Style</Text>
-            <View style={styles.barList}>
-              <StatBar
-                label="Texting first"
-                pct={insights.commStyleBreakdown.textingFirst}
-              />
-              <StatBar
-                label="Voice early"
-                pct={insights.commStyleBreakdown.voiceEarly}
-              />
-              <StatBar
-                label="Meet in person"
-                pct={insights.commStyleBreakdown.meetInPerson}
-              />
-            </View>
+            <Text style={styles.metricLabel}>Match Outcomes</Text>
+            {matchTotal === 0 ? (
+              <Text style={styles.hint}>No matches yet.</Text>
+            ) : (
+              <View style={styles.barList}>
+                <StatBar label="Connected" pct={pct(o.connected)} />
+                <StatBar label="Skipped" pct={pct(o.skipped)} />
+                <StatBar label="Expired" pct={pct(o.expired)} />
+              </View>
+            )}
           </View>
           <View style={styles.metricCard}>
-            <Text style={styles.metricLabel}>Messaging Patterns</Text>
+            <Text style={styles.metricLabel}>Messaging</Text>
             <View style={styles.statBlock}>
-              <Text style={styles.statValue}>
-                {insights.avgReplyTimeHours.toFixed(1)}h
-              </Text>
+              <Text style={styles.statValue}>{avgReply}</Text>
               <Text style={styles.statCaption}>avg reply time</Text>
             </View>
             <View style={styles.statBlock}>
-              <Text style={styles.statValue}>{insights.messagesSentLast7Days}</Text>
+              <Text style={styles.statValue}>{insights?.messagesSentLast7Days ?? 0}</Text>
               <Text style={styles.statCaption}>messages, last 7d</Text>
+            </View>
+            <View style={styles.statBlock}>
+              <Text style={styles.statValue}>{insights?.totalMessages ?? 0}</Text>
+              <Text style={styles.statCaption}>messages total</Text>
             </View>
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>Reflection Moments</Text>
-        <View style={styles.reflectionList}>
-          {insights.expiredMatches.map((m) => (
-            <View key={m.matchId} style={styles.reflectionCard}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{m.name[0]}</Text>
-              </View>
-              <View style={styles.reflectionBody}>
-                <Text style={styles.reflectionName}>
-                  {m.name}, {m.age}
-                </Text>
-                <Text style={styles.reflectionReason}>{m.suggestedReason}</Text>
-              </View>
+        <Text style={styles.sectionTitle}>Calibration Signal</Text>
+        <View style={styles.fullCard}>
+          {interestsPct == null && looksPct == null ? (
+            <Text style={styles.hint}>
+              Swipe in the Discover tab to build your calibration signal.
+            </Text>
+          ) : (
+            <View style={styles.barList}>
+              <StatBar label="Interests liked" pct={interestsPct ?? 0} />
+              <StatBar label="Looks liked" pct={looksPct ?? 0} />
             </View>
-          ))}
+          )}
         </View>
+
+        <Text style={styles.sectionTitle}>Reflection Moments</Text>
+        {insights && insights.reflections.length > 0 ? (
+          <View style={styles.reflectionList}>
+            {insights.reflections.map((m) => (
+              <View key={m.matchId} style={styles.reflectionCard}>
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>{m.name[0]}</Text>
+                </View>
+                <View style={styles.reflectionBody}>
+                  <Text style={styles.reflectionName}>
+                    {m.name}, {m.age}
+                  </Text>
+                  <Text style={styles.reflectionReason}>{m.reason}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        ) : (
+          <View style={styles.fullCard}>
+            <Text style={styles.hint}>
+              Reflections appear here when a match is skipped or expires.
+            </Text>
+          </View>
+        )}
 
         <View style={styles.intentCard}>
           <Text style={styles.intentLabel}>Your Intent Score</Text>
           <Text style={styles.intentValue}>
-            {insights.intentScore.toFixed(1)}
+            {(insights?.intentScore ?? 0).toFixed(1)}
             <Text style={styles.intentMax}> / 10</Text>
           </Text>
-          <Text style={styles.intentCaption}>Keep up the thoughtful interactions</Text>
+          <Text style={styles.intentCaption}>Updated from your real activity</Text>
         </View>
 
         <View style={styles.footerLinks}>
@@ -166,7 +209,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
 
-  metricRow: { flexDirection: 'row', gap: spacing.md },
+  metricRow: { flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' },
   metricCard: {
     flex: 1,
     backgroundColor: colors.surface,
@@ -174,7 +217,13 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     gap: spacing.sm,
   },
+  fullCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    padding: spacing.md,
+  },
   metricLabel: { ...typography.caption, color: colors.textMuted },
+  hint: { ...typography.caption, color: colors.textMuted, marginTop: spacing.xs },
 
   barList: { gap: spacing.sm, marginTop: spacing.xs },
   statBar: { gap: 4 },
@@ -228,14 +277,8 @@ const styles = StyleSheet.create({
   intentMax: { ...typography.title, color: colors.textMuted },
   intentCaption: { ...typography.caption, color: colors.textMuted },
 
-  footerLinks: {
-    marginTop: spacing.xl,
-    gap: spacing.sm,
-    alignItems: 'center',
-  },
-  linkBtn: {
-    paddingVertical: spacing.sm,
-  },
+  footerLinks: { marginTop: spacing.xl, gap: spacing.sm, alignItems: 'center' },
+  linkBtn: { paddingVertical: spacing.sm },
   linkLabel: {
     ...typography.caption,
     color: colors.textMuted,

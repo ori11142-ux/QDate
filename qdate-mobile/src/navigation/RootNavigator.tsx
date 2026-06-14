@@ -27,9 +27,15 @@ export type RootStackParamList = {
     password: string;
     age: number;
     authMethod: AuthMethod;
+    photoUrl: string | null;
   };
   Main: undefined;
-  Chat: { matchId: string };
+  Chat: {
+    matchId: string;
+    conversationId?: string;
+    candidateName?: string;
+    candidatePhotoUrl?: string;
+  };
 };
 
 export type MainTabParamList = {

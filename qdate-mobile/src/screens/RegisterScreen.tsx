@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
+  Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -11,6 +13,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 
 import { PrimaryButton } from '../components/PrimaryButton';
 import { ProgressBar } from '../components/ProgressBar';
@@ -26,6 +29,7 @@ export function RegisterScreen({ navigation, route }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [age, setAge] = useState('');
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
 
   const ageNumber = parseInt(age, 10);
   const isValid =
@@ -37,6 +41,36 @@ export function RegisterScreen({ navigation, route }: Props) {
     ageNumber >= 18 &&
     ageNumber <= 99;
 
+  async function handlePickPhoto() {
+    // In Expo Go the photo-library permission is handled by Expo Go itself,
+    // so this works without extra native config during development.
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert(
+        'Photo access needed',
+        'Allow photo library access to add a profile picture.'
+      );
+      return;
+    }
+
+    // mediaTypes defaults to images. quality + square crop keep the base64 small.
+    const result = await ImagePicker.launchImageLibraryAsync({
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.4,
+      base64: true,
+    });
+
+    if (!result.canceled && result.assets.length > 0) {
+      const asset = result.assets[0];
+      if (asset.base64) {
+        setPhotoUrl(`data:image/jpeg;base64,${asset.base64}`);
+      } else if (asset.uri) {
+        setPhotoUrl(asset.uri);
+      }
+    }
+  }
+
   function handleContinue() {
     if (!isValid) return;
     navigation.navigate('Onboarding', {
@@ -45,6 +79,7 @@ export function RegisterScreen({ navigation, route }: Props) {
       password,
       age: ageNumber,
       authMethod,
+      photoUrl,
     });
   }
 
@@ -71,6 +106,24 @@ export function RegisterScreen({ navigation, route }: Props) {
           <Text style={styles.subtitle}>
             We&apos;ll use this to introduce you to your matches.
           </Text>
+
+          {/* Photo picker */}
+          <View style={styles.photoSection}>
+            <Pressable onPress={handlePickPhoto} style={styles.photoCircle}>
+              {photoUrl ? (
+                <Image source={{ uri: photoUrl }} style={styles.photoImage} />
+              ) : (
+                <View style={styles.photoPlaceholder}>
+                  <Text style={styles.photoPlaceholderIcon}>+</Text>
+                </View>
+              )}
+            </Pressable>
+            <Pressable onPress={handlePickPhoto} hitSlop={8}>
+              <Text style={styles.photoLabel}>
+                {photoUrl ? 'Change photo' : 'Add a photo'}
+              </Text>
+            </Pressable>
+          </View>
 
           <View style={styles.form}>
             <Field
@@ -188,7 +241,41 @@ const styles = StyleSheet.create({
   subtitle: {
     ...typography.body,
     color: colors.textMuted,
-    marginBottom: spacing.xl,
+    marginBottom: spacing.lg,
+  },
+
+  photoSection: {
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
+  },
+  photoCircle: {
+    width: 112,
+    height: 112,
+    borderRadius: 56,
+    overflow: 'hidden',
+    backgroundColor: colors.surface,
+  },
+  photoImage: { width: '100%', height: '100%' },
+  photoPlaceholder: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 56,
+    borderWidth: 2,
+    borderColor: colors.primaryLight,
+    borderStyle: 'dashed',
+    backgroundColor: colors.surfaceMuted,
+  },
+  photoPlaceholderIcon: {
+    fontSize: 40,
+    color: colors.primary,
+    fontWeight: '300',
+  },
+  photoLabel: {
+    ...typography.body,
+    color: colors.primary,
+    fontWeight: '600',
   },
 
   form: { gap: spacing.lg },

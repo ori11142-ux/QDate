@@ -31,25 +31,22 @@ export const mockWeeklyMatch: Match = {
 
 export const mockInsights: InsightsSummary = {
   intentScore: 7.5,
-  commStyleBreakdown: {
-    textingFirst: 45,
-    voiceEarly: 30,
-    meetInPerson: 25,
-  },
   avgReplyTimeHours: 2.1,
   messagesSentLast7Days: 13,
-  expiredMatches: [
+  totalMessages: 48,
+  matchOutcomes: {
+    connected: 2,
+    skipped: 3,
+    expired: 1,
+    pendingOrActive: 1,
+  },
+  calibration: { interests: 0.45, looks: 0.6 },
+  reflections: [
     {
       matchId: 'm_old_01',
       name: 'Sarah',
       age: 30,
-      suggestedReason: 'Timing wasn\'t right',
-    },
-    {
-      matchId: 'm_old_02',
-      name: 'David',
-      age: 28,
-      suggestedReason: 'Interests didn\'t align',
+      reason: 'You skipped this match - what felt off?',
     },
   ],
 };

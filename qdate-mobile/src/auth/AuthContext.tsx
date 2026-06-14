@@ -10,6 +10,9 @@ export type RegisterInput = {
   age: number;
   authMethod: 'email' | 'apple';
   password: string;
+  photoUrl?: string | null;
+  gender?: 'man' | 'woman' | null;
+  attraction?: 'men' | 'women' | 'both' | null;
   profile: {
     intent: 'long_term' | 'casual' | 'explore' | 'friendship';
     sharedIntellectImportance: number;
@@ -35,6 +38,9 @@ function backendUserToStored(u: BackendUser): StoredUser {
     email: u.email,
     age: u.age,
     authMethod: u.authMethod,
+    photoUrl: u.photoUrl ?? null,
+    gender: u.gender ?? null,
+    attraction: u.attraction ?? null,
     profile: u.profile,
     currentPhase: u.currentPhase,
     registeredAt: u.createdAt,

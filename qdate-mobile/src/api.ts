@@ -12,11 +12,8 @@ import {
   MessageEvent,
 } from './types';
 import {
-  mockInsights,
   mockInterestDeck,
   mockLookDeck,
-  mockMatch,
-  mockWeeklyMatch,
 } from './mocks';
 
 // ─── Backend host resolution ──────────────────────────────────────────────
@@ -85,6 +82,9 @@ export interface BackendUser {
   email: string;
   age: number;
   authMethod: 'email' | 'apple';
+  photoUrl: string | null;
+  gender: 'man' | 'woman' | null;
+  attraction: 'men' | 'women' | 'both' | null;
   profile: {
     intent: 'long_term' | 'casual' | 'explore' | 'friendship';
     sharedIntellectImportance: number;
@@ -101,6 +101,9 @@ export type RegisterPayload = {
   age: number;
   authMethod: 'email' | 'apple';
   password: string;
+  photoUrl?: string | null;
+  gender?: 'man' | 'woman' | null;
+  attraction?: 'men' | 'women' | 'both' | null;
   profile: BackendUser['profile'];
 };
 
@@ -121,8 +124,8 @@ export const api = {
   },
 
   // ── Matches / insights / calibration — mockable for now ───────────────────
+  // ── Matches — REAL backend (heuristic matcher) ────────────────────────────
   async generateDailyMatch(userId: string): Promise<Match> {
-    if (USE_MOCK_API) return mockMatch;
     return request<Match>('/match/daily_generate', {
       method: 'POST',
       body: JSON.stringify({ user_id: userId }),
@@ -130,8 +133,51 @@ export const api = {
   },
 
   async getWeeklyCuratedMatch(userId: string): Promise<Match> {
-    if (USE_MOCK_API) return mockWeeklyMatch;
     return request<Match>(`/match/weekly_curated/${userId}`);
+  },
+
+  async revealMatch(matchId: string): Promise<void> {
+    await request(`/match/${matchId}/reveal`, { method: 'POST' });
+  },
+
+  async skipMatch(matchId: string): Promise<void> {
+    await request(`/match/${matchId}/skip`, { method: 'POST' });
+  },
+
+  async connectMatch(matchId: string): Promise<void> {
+    await request(`/match/${matchId}/connect`, { method: 'POST' });
+  },
+
+  // ── Conversations (shared real chat) ──────────────────────────────────────
+  async getConversationStatus(
+    conversationId: string
+  ): Promise<{ total: number; connected: number; bothConnected: boolean }> {
+    return request(`/conversations/${conversationId}/status`);
+  },
+
+  async getConversationMessages(conversationId: string): Promise<
+    {
+      id: string;
+      conversationId: string;
+      senderId: string;
+      text: string;
+      messageLength: number;
+      responseTimeSeconds: number | null;
+      sentAt: string;
+    }[]
+  > {
+    return request(`/conversations/${conversationId}/messages`);
+  },
+
+  async sendConversationMessage(
+    conversationId: string,
+    senderId: string,
+    text: string
+  ): Promise<{ id: string; sentAt: string }> {
+    return request(`/conversations/${conversationId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ senderId, text }),
+    });
   },
 
   async recordMessageEvent(event: MessageEvent): Promise<{ intent_score_updated: boolean }> {
@@ -151,7 +197,6 @@ export const api = {
   },
 
   async getInsights(userId: string): Promise<InsightsSummary> {
-    if (USE_MOCK_API) return mockInsights;
     return request<InsightsSummary>(`/insights/${userId}`);
   },
 

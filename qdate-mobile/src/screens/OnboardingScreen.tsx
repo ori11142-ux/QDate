@@ -14,7 +14,7 @@ import { useAuth } from '../auth/AuthContext';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { ProgressBar } from '../components/ProgressBar';
 import { RootStackParamList } from '../navigation/RootNavigator';
-import { CommStyle, DatingIntent } from '../types';
+import { Attraction, CommStyle, DatingIntent, Gender } from '../types';
 import { colors, radius, spacing, typography } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Onboarding'>;
@@ -32,17 +32,32 @@ const COMM_OPTIONS: { value: CommStyle; label: string }[] = [
   { value: 'meet_in_person', label: 'Meet in Person' },
 ];
 
+const GENDER_OPTIONS: { value: Gender; label: string }[] = [
+  { value: 'man', label: 'Man' },
+  { value: 'woman', label: 'Woman' },
+];
+
+const ATTRACTION_OPTIONS: { value: Attraction; label: string }[] = [
+  { value: 'men', label: 'Men' },
+  { value: 'women', label: 'Women' },
+  { value: 'both', label: 'Both' },
+];
+
 export function OnboardingScreen({ route }: Props) {
-  const { name, email, password, age, authMethod } = route.params;
+  const { name, email, password, age, authMethod, photoUrl } = route.params;
   const { register } = useAuth();
 
   const [intent, setIntent] = useState<DatingIntent | null>(null);
   const [intellect, setIntellect] = useState<number>(0);
   const [comm, setComm] = useState<CommStyle | null>(null);
+  const [gender, setGender] = useState<Gender | null>(null);
+  const [attraction, setAttraction] = useState<Attraction | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const stepsComplete = [intent, intellect > 0, comm].filter(Boolean).length;
-  const ready = stepsComplete === 3;
+  const stepsComplete = [intent, intellect > 0, comm, gender, attraction].filter(
+    Boolean
+  ).length;
+  const ready = stepsComplete === 5;
 
   async function handleStart() {
     if (!ready || submitting) return;
@@ -56,6 +71,9 @@ export function OnboardingScreen({ route }: Props) {
         age,
         authMethod,
         password,
+        photoUrl,
+        gender,
+        attraction,
         profile: {
           intent: intent!,
           sharedIntellectImportance: intellect,
@@ -113,6 +131,46 @@ export function OnboardingScreen({ route }: Props) {
                 style={[
                   styles.commChipLabel,
                   comm === opt.value && styles.commChipLabelSelected,
+                ]}
+              >
+                {opt.label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
+        <Text style={styles.question}>Your gender?</Text>
+        <View style={styles.commRow}>
+          {GENDER_OPTIONS.map((opt) => (
+            <Pressable
+              key={opt.value}
+              onPress={() => setGender(opt.value)}
+              style={[styles.commChip, gender === opt.value && styles.commChipSelected]}
+            >
+              <Text
+                style={[
+                  styles.commChipLabel,
+                  gender === opt.value && styles.commChipLabelSelected,
+                ]}
+              >
+                {opt.label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
+        <Text style={styles.question}>Interested in?</Text>
+        <View style={styles.commRow}>
+          {ATTRACTION_OPTIONS.map((opt) => (
+            <Pressable
+              key={opt.value}
+              onPress={() => setAttraction(opt.value)}
+              style={[styles.commChip, attraction === opt.value && styles.commChipSelected]}
+            >
+              <Text
+                style={[
+                  styles.commChipLabel,
+                  attraction === opt.value && styles.commChipLabelSelected,
                 ]}
               >
                 {opt.label}

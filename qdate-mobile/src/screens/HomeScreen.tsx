@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  Image,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -36,10 +37,23 @@ export function HomeScreen() {
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.greeting}>
-          {greeting}{user ? `, ${user.name.split(' ')[0]}` : ''}
-        </Text>
-        <Text style={styles.phase}>{phaseLabel}</Text>
+        <View style={styles.headerRow}>
+          <View style={styles.headerText}>
+            <Text style={styles.greeting}>
+              {greeting}{user ? `, ${user.name.split(' ')[0]}` : ''}
+            </Text>
+            <Text style={styles.phase}>{phaseLabel}</Text>
+          </View>
+          <View style={styles.avatar}>
+            {user?.photoUrl ? (
+              <Image source={{ uri: user.photoUrl }} style={styles.avatarImage} />
+            ) : (
+              <Text style={styles.avatarInitial}>
+                {user?.name?.[0]?.toUpperCase() ?? '?'}
+              </Text>
+            )}
+          </View>
+        </View>
 
         <View style={styles.tipCard}>
           <Text style={styles.tipKicker}>Tip for today</Text>
@@ -81,6 +95,27 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   scroll: { padding: spacing.lg, paddingBottom: spacing.xxl },
 
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  headerText: { flex: 1 },
+  avatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    overflow: 'hidden',
+    backgroundColor: colors.surfaceMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarImage: { width: '100%', height: '100%' },
+  avatarInitial: {
+    ...typography.title,
+    color: colors.primary,
+  },
   greeting: {
     ...typography.display,
     color: colors.text,

@@ -15,6 +15,9 @@ export type RegisterInput = {
   age: number;
   authMethod: 'email' | 'apple';
   password: string;
+  photoUrl?: string | null;
+  gender?: 'man' | 'woman' | null;
+  attraction?: 'men' | 'women' | 'both' | null;
   profile: {
     intent: 'long_term' | 'casual' | 'explore' | 'friendship';
     sharedIntellectImportance: number;
@@ -41,6 +44,9 @@ export async function registerWithPassword(input: RegisterInput): Promise<UserDo
     name: input.name,
     age: input.age,
     authMethod: input.authMethod,
+    photoUrl: input.photoUrl ?? null,
+    gender: input.gender ?? null,
+    attraction: input.attraction ?? null,
     passwordHash,
     profile: input.profile,
   });

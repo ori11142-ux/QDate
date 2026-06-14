@@ -4,6 +4,8 @@ export const DATING_INTENTS = ['long_term', 'casual', 'explore', 'friendship'] a
 export const COMM_STYLES = ['texting_first', 'voice_early', 'meet_in_person'] as const;
 export const AUTH_METHODS = ['email', 'apple'] as const;
 export const PHASES = ['phase_1', 'phase_2'] as const;
+export const GENDERS = ['man', 'woman'] as const;
+export const ATTRACTIONS = ['men', 'women', 'both'] as const;
 
 const userSchema = new Schema(
   {
@@ -19,8 +21,14 @@ const userSchema = new Schema(
     age: { type: Number, required: true, min: 18, max: 99 },
     authMethod: { type: String, enum: AUTH_METHODS, required: true },
 
-    // bcrypt hash. select:false means it is never returned unless explicitly
-    // requested with .select('+passwordHash'). Null for OAuth-only accounts.
+    // The user's own gender, and who they're interested in.
+    gender: { type: String, enum: GENDERS, default: null },
+    attraction: { type: String, enum: ATTRACTIONS, default: null },
+
+    // Profile picture. Stores either an external URL or a data URI
+    // ("data:image/jpeg;base64,..."). Null until the user adds one.
+    photoUrl: { type: String, default: null },
+
     passwordHash: { type: String, default: null, select: false },
 
     profile: {
@@ -42,7 +50,7 @@ userSchema.set('toJSON', {
   transform: (_doc, ret) => {
     const r = ret as Record<string, unknown>;
     delete r._id;
-    delete r.passwordHash; // belt-and-suspenders — never serialize the hash
+    delete r.passwordHash;
   },
 });
 

@@ -2,6 +2,8 @@
 
 export type DatingIntent = 'long_term' | 'casual' | 'explore' | 'friendship';
 export type CommStyle = 'texting_first' | 'voice_early' | 'meet_in_person';
+export type Gender = 'man' | 'woman';
+export type Attraction = 'men' | 'women' | 'both';
 export type Phase = 'phase_1' | 'phase_2';
 export type CalibrationMode = 'interests' | 'looks';
 
@@ -13,6 +15,8 @@ export interface IntentProfile {
 
 export interface Match {
   matchId: string;
+  conversationId?: string;
+  status?: 'pending_reveal' | 'active' | 'connected' | 'skipped' | 'expired';
   candidateName: string;
   candidateAge: number;
   candidateBio: string;
@@ -40,19 +44,17 @@ export interface FeedbackPayload {
 
 export interface InsightsSummary {
   intentScore: number;
-  commStyleBreakdown: {
-    textingFirst: number;
-    voiceEarly: number;
-    meetInPerson: number;
-  };
-  avgReplyTimeHours: number;
+  avgReplyTimeHours: number | null;
   messagesSentLast7Days: number;
-  expiredMatches: {
-    matchId: string;
-    name: string;
-    age: number;
-    suggestedReason: string;
-  }[];
+  totalMessages: number;
+  matchOutcomes: {
+    connected: number;
+    skipped: number;
+    expired: number;
+    pendingOrActive: number;
+  };
+  calibration: { interests: number | null; looks: number | null };
+  reflections: { matchId: string; name: string; age: number; reason: string }[];
 }
 
 export interface ChatMessage {

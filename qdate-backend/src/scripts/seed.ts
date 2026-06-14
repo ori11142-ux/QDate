@@ -1,184 +1,96 @@
 /**
- * Wipe and reseed the database with test data.
- * Run with: npm run seed
+ * Wipe the database and seed a batch of test profiles you can log in as.
+ *
+ *   npm run seed
+ *
+ * Every profile shares the SAME password (printed at the end), so you can sign
+ * in as any of them to test matching, chat (from both sides), and insights.
  */
 
 import 'dotenv/config';
 import mongoose from 'mongoose';
+import bcrypt from 'bcryptjs';
 import { connectToDb, disconnectFromDb } from '../config/db';
 import { UserModel } from '../models/User';
 import { MatchModel } from '../models/Match';
 import { MessageModel } from '../models/Message';
 import { SwipeModel } from '../models/Swipe';
 
+// The shared login password for every seeded account.
+const PASSWORD = 'qdate1234';
+
+// 14 varied profiles. Genders/attractions are spread so a typical test account
+// (a man into women, or a woman into men) has several mutual matches available.
+const PROFILES = [
+  // ── men ──────────────────────────────────────────────────────────────────
+  { name: 'Noah Bennett',  age: 27, gender: 'man',   attraction: 'women', intent: 'long_term',  intellect: 5, comm: 'texting_first',  score: 7.2, img: 11 },
+  { name: 'Itai Cohen',    age: 31, gender: 'man',   attraction: 'women', intent: 'casual',     intellect: 3, comm: 'voice_early',    score: 5.6, img: 13 },
+  { name: 'Daniel Roth',   age: 24, gender: 'man',   attraction: 'both',  intent: 'explore',    intellect: 4, comm: 'meet_in_person', score: 6.1, img: 14 },
+  { name: 'Adam Frost',    age: 35, gender: 'man',   attraction: 'women', intent: 'long_term',  intellect: 5, comm: 'texting_first',  score: 8.3, img: 15 },
+  { name: 'Yonatan Levi',  age: 29, gender: 'man',   attraction: 'women', intent: 'friendship', intellect: 2, comm: 'voice_early',    score: 4.8, img: 51 },
+  { name: 'Omer Katz',     age: 26, gender: 'man',   attraction: 'both',  intent: 'casual',     intellect: 4, comm: 'meet_in_person', score: 6.9, img: 52 },
+  // ── women ────────────────────────────────────────────────────────────────
+  { name: 'Maya Chen',     age: 28, gender: 'woman', attraction: 'men',   intent: 'long_term',  intellect: 5, comm: 'texting_first',  score: 8.0, img: 44 },
+  { name: 'Noa Shapiro',   age: 25, gender: 'woman', attraction: 'both',  intent: 'casual',     intellect: 3, comm: 'voice_early',    score: 5.9, img: 45 },
+  { name: 'Tamar Klein',   age: 33, gender: 'woman', attraction: 'men',   intent: 'long_term',  intellect: 5, comm: 'meet_in_person', score: 8.6, img: 47 },
+  { name: 'Shira Avni',    age: 27, gender: 'woman', attraction: 'men',   intent: 'explore',    intellect: 4, comm: 'texting_first',  score: 6.4, img: 48 },
+  { name: 'Yael Bar',      age: 30, gender: 'woman', attraction: 'both',  intent: 'long_term',  intellect: 4, comm: 'voice_early',    score: 7.5, img: 49 },
+  { name: 'Olivia Park',   age: 29, gender: 'woman', attraction: 'men',   intent: 'casual',     intellect: 3, comm: 'texting_first',  score: 6.0, img: 26 },
+  { name: 'Emma Wright',   age: 26, gender: 'woman', attraction: 'women', intent: 'long_term',  intellect: 5, comm: 'meet_in_person', score: 7.8, img: 31 },
+  { name: 'Lior Mizrahi',  age: 32, gender: 'woman', attraction: 'men',   intent: 'friendship', intellect: 2, comm: 'voice_early',    score: 5.1, img: 32 },
+] as const;
+
+function emailFor(name: string): string {
+  // "Noah Bennett" -> "noah.bennett@qdate.test"
+  return `${name.toLowerCase().replace(/\s+/g, '.')}@qdate.test`;
+}
+
 async function main() {
   await connectToDb();
 
-  console.log('[seed] wiping collections…');
-  await Promise.all([
+  console.log('[seed] wiping all collections…');
+  const [u, m, msg, s] = await Promise.all([
     UserModel.deleteMany({}),
     MatchModel.deleteMany({}),
     MessageModel.deleteMany({}),
     SwipeModel.deleteMany({}),
   ]);
+  console.log(
+    `[seed] removed ${u.deletedCount} users, ${m.deletedCount} matches, ` +
+      `${msg.deletedCount} messages, ${s.deletedCount} swipes.`
+  );
 
-  console.log('[seed] creating users…');
-  const [ori, olivia, maya, david] = await UserModel.insertMany([
-    {
-      email: 'ori@qdate.app',
-      name: 'Ori Blaish',
-      age: 28,
-      authMethod: 'email',
-      profile: {
-        intent: 'long_term',
-        sharedIntellectImportance: 5,
-        commStyle: 'texting_first',
-      },
-      currentPhase: 'phase_1',
-      intentScore: 7.5,
-    },
-    {
-      email: 'olivia@qdate.app',
-      name: 'Olivia Park',
-      age: 29,
-      authMethod: 'apple',
-      profile: {
-        intent: 'long_term',
-        sharedIntellectImportance: 4,
-        commStyle: 'voice_early',
-      },
-      currentPhase: 'phase_1',
-      intentScore: 6.8,
-    },
-    {
-      email: 'maya@qdate.app',
-      name: 'Maya Chen',
-      age: 31,
-      authMethod: 'email',
-      profile: {
-        intent: 'long_term',
-        sharedIntellectImportance: 5,
-        commStyle: 'meet_in_person',
-      },
-      currentPhase: 'phase_2',
-      intentScore: 8.4,
-    },
-    {
-      email: 'david@qdate.app',
-      name: 'David Stern',
-      age: 30,
-      authMethod: 'email',
-      profile: {
-        intent: 'casual',
-        sharedIntellectImportance: 3,
-        commStyle: 'texting_first',
-      },
-      currentPhase: 'phase_1',
-      intentScore: 5.2,
-    },
-  ]);
+  console.log(`[seed] hashing shared password…`);
+  const passwordHash = await bcrypt.hash(PASSWORD, 10);
 
-  console.log(`[seed] created ${ori.email}, ${olivia.email}, ${maya.email}, ${david.email}`);
-
-  console.log('[seed] creating matches…');
-  const dailyMatch = await MatchModel.create({
-    userId: ori._id,
-    candidateUserId: olivia._id,
-    phase: 'phase_1',
-    status: 'active',
-    revealedAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
-    expiresAt: new Date(Date.now() + 22 * 60 * 60 * 1000),
-    dayInLearningPeriod: 3,
-  });
-
-  const weeklyMatch = await MatchModel.create({
-    userId: maya._id,
-    candidateUserId: david._id,
-    phase: 'phase_2',
-    status: 'pending_reveal',
-    expiresAt: new Date(Date.now() + 6 * 24 * 60 * 60 * 1000),
-    isIntentionalPairing: true,
-  });
-
-  console.log('[seed] creating messages in the active match…');
-  const baseTime = Date.now() - 90 * 60 * 1000; // 90 minutes ago
-  const conversation = [
-    {
-      senderId: olivia._id,
-      text: 'Hey! I saw you also like indie films. Have you watched anything good lately?',
-      offsetMs: 0,
+  console.log(`[seed] creating ${PROFILES.length} profiles…`);
+  const docs = PROFILES.map((p) => ({
+    email: emailFor(p.name),
+    name: p.name,
+    age: p.age,
+    authMethod: 'email' as const,
+    gender: p.gender,
+    attraction: p.attraction,
+    photoUrl: `https://i.pravatar.cc/400?img=${p.img}`,
+    passwordHash,
+    profile: {
+      intent: p.intent,
+      sharedIntellectImportance: p.intellect,
+      commStyle: p.comm,
     },
-    {
-      senderId: ori._id,
-      text: 'Yes — finally caught Past Lives last week. It wrecked me.',
-      offsetMs: 18 * 60 * 1000, // 18 min later
-    },
-    {
-      senderId: olivia._id,
-      text: 'God, same. The airport scene. I had to sit in my car for ten minutes after.',
-      offsetMs: 22 * 60 * 1000,
-    },
-    {
-      senderId: ori._id,
-      text: 'What are you watching this weekend?',
-      offsetMs: 47 * 60 * 1000,
-    },
-  ];
+    currentPhase: 'phase_1' as const,
+    intentScore: p.score,
+  }));
+  await UserModel.insertMany(docs);
 
-  for (const m of conversation) {
-    const sentAt = new Date(baseTime + m.offsetMs);
-    // Find latency since the other party's last message (recreating recordMessage's logic).
-    const lastFromOther = await MessageModel.findOne({
-      matchId: dailyMatch._id,
-      senderId: { $ne: m.senderId },
-    })
-      .sort({ sentAt: -1 })
-      .select('sentAt');
-    const responseTimeSeconds = lastFromOther
-      ? Math.max(0, Math.floor((sentAt.getTime() - lastFromOther.sentAt.getTime()) / 1000))
-      : null;
-
-    await MessageModel.create({
-      matchId: dailyMatch._id,
-      senderId: m.senderId,
-      text: m.text,
-      messageLength: m.text.length,
-      responseTimeSeconds,
-      sentAt,
-    });
+  console.log('\n[seed] done. Log in with any of these:\n');
+  for (const p of PROFILES) {
+    console.log(
+      `   ${emailFor(p.name).padEnd(30)}  ${p.gender.padEnd(6)} into ${p.attraction}`
+    );
   }
-
-  console.log('[seed] creating calibration swipes for Ori…');
-  const interestCards = ['int_01', 'int_02', 'int_03', 'int_04', 'int_05', 'int_06'];
-  const lookCards = ['look_01', 'look_02', 'look_03', 'look_04', 'look_05'];
-
-  const swipes = [
-    ...interestCards.map((cardId, i) => ({
-      userId: ori._id,
-      cardId,
-      mode: 'interests' as const,
-      liked: i % 2 === 0,
-      responseTimeMs: 1000 + Math.floor(Math.random() * 3000),
-      swipedAt: new Date(Date.now() - (interestCards.length - i) * 60 * 1000),
-    })),
-    ...lookCards.map((cardId, i) => ({
-      userId: ori._id,
-      cardId,
-      mode: 'looks' as const,
-      liked: i < 3,
-      responseTimeMs: 500 + Math.floor(Math.random() * 1500), // looks are faster
-      swipedAt: new Date(Date.now() - (lookCards.length - i) * 50 * 1000),
-    })),
-  ];
-  await SwipeModel.insertMany(swipes);
-
-  console.log('[seed] done.');
-  console.log({
-    users: await UserModel.countDocuments(),
-    matches: await MatchModel.countDocuments(),
-    messages: await MessageModel.countDocuments(),
-    swipes: await SwipeModel.countDocuments(),
-  });
+  console.log(`\n   Password for ALL accounts:  ${PASSWORD}\n`);
+  console.log({ users: await UserModel.countDocuments() });
 
   await disconnectFromDb();
 }

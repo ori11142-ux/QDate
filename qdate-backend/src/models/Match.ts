@@ -21,6 +21,10 @@ const matchSchema = new Schema(
     expiresAt: { type: Date, required: true },
     revealedAt: { type: Date, default: null },
 
+    // Shared between both sides of a mutual pairing — the key chat messages
+    // are stored against. Both the A→B and B→A match docs carry the same value.
+    conversationId: { type: String, default: null, index: true },
+
     // Phase 2 only — populated by the curation pipeline.
     isIntentionalPairing: { type: Boolean, default: false },
 

@@ -11,8 +11,12 @@ import { Schema, model, InferSchemaType, HydratedDocument } from 'mongoose';
  */
 const messageSchema = new Schema(
   {
-    matchId: { type: Schema.Types.ObjectId, ref: 'Match', required: true, index: true },
+    matchId: { type: Schema.Types.ObjectId, ref: 'Match', required: false, index: true },
     senderId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+
+    // Shared conversation key (same for both sides of a mutual pairing).
+    // Chat reads/writes are keyed off this so both people see one thread.
+    conversationId: { type: String, default: null, index: true },
 
     text: { type: String, required: true, maxlength: 5000 },
 

@@ -11,9 +11,24 @@ import {
   listMessagesForMatch,
   recordMessage,
   markMessagesReadForUser,
+  recordConversationMessage,
+  listConversationMessages,
 } from '../services/messages';
 import { recordSwipe, listSwipesForUser } from '../services/swipes';
-import { getCurrentMatchForUser } from '../services/matches';
+import {
+  getCurrentMatchForUser,
+  markRevealed,
+  markSkipped,
+  markConnected,
+  findMatchById,
+  skipPairing,
+  getPairingConnectState,
+} from '../services/matches';
+import {
+  generateMatchForUser,
+  toClientMatch,
+} from '../services/matchmaker';
+import { computeInsights } from '../services/insights';
 
 export const router = Router();
 
@@ -32,7 +47,8 @@ router.get('/health', (_req, res) => {
 
 router.post('/auth/register', async (req, res) => {
   try {
-    const { email, name, age, authMethod, password, profile } = req.body;
+    const { email, name, age, authMethod, password, photoUrl, gender, attraction, profile } =
+      req.body;
     if (!email || !name || !age || !password || !profile) {
       res
         .status(400)
@@ -45,6 +61,9 @@ router.post('/auth/register', async (req, res) => {
       age,
       authMethod: authMethod ?? 'email',
       password,
+      photoUrl,
+      gender,
+      attraction,
       profile,
     });
     res.status(201).json(user.toJSON());
@@ -119,6 +138,73 @@ router.get('/matches/current/:userId', async (req, res) => {
   res.json(match?.toJSON() ?? null);
 });
 
+// Generate (or return the existing) Phase 1 daily match for a user.
+router.post('/match/daily_generate', async (req, res) => {
+  try {
+    const userId = req.body.user_id ?? req.body.userId;
+    if (!userId) {
+      res.status(400).json({ error: 'user_id is required' });
+      return;
+    }
+    const result = await generateMatchForUser(userId, 'phase_1');
+    if (!result) {
+      res.status(404).json({ error: 'No candidates available right now' });
+      return;
+    }
+    res.json(toClientMatch(result.match, result.candidate));
+  } catch (e: any) {
+    res.status(400).json({ error: e?.message ?? 'Failed to generate match' });
+  }
+});
+
+// Generate (or return the existing) Phase 2 weekly curated match for a user.
+router.get('/match/weekly_curated/:userId', async (req, res) => {
+  try {
+    const result = await generateMatchForUser(req.params.userId, 'phase_2');
+    if (!result) {
+      res.status(404).json({ error: 'No candidates available right now' });
+      return;
+    }
+    res.json(toClientMatch(result.match, result.candidate));
+  } catch (e: any) {
+    res.status(400).json({ error: e?.message ?? 'Failed to generate match' });
+  }
+});
+
+// Match state transitions.
+router.post('/match/:matchId/reveal', async (req, res) => {
+  const match = await markRevealed(req.params.matchId);
+  if (!match) {
+    res.status(404).json({ error: 'Match not found' });
+    return;
+  }
+  res.json(match.toJSON());
+});
+
+router.post('/match/:matchId/skip', async (req, res) => {
+  const match = await findMatchById(req.params.matchId);
+  if (!match) {
+    res.status(404).json({ error: 'Match not found' });
+    return;
+  }
+  // End both sides of the mutual pairing.
+  if (match.conversationId) {
+    await skipPairing(match.conversationId);
+  } else {
+    await markSkipped(match._id);
+  }
+  res.json({ ok: true });
+});
+
+router.post('/match/:matchId/connect', async (req, res) => {
+  const match = await markConnected(req.params.matchId);
+  if (!match) {
+    res.status(404).json({ error: 'Match not found' });
+    return;
+  }
+  res.json(match.toJSON());
+});
+
 // ─── Messages ───────────────────────────────────────────────────────────────
 
 router.post('/messages', async (req, res) => {
@@ -170,4 +256,46 @@ router.get('/swipes/:userId', async (req, res) => {
   const mode = req.query.mode as 'interests' | 'looks' | undefined;
   const swipes = await listSwipesForUser(req.params.userId, mode);
   res.json(swipes.map((s) => s.toJSON()));
+});
+
+// ─── Conversations (shared chat for mutual pairings) ──────────────────────────
+
+router.get('/conversations/:conversationId/messages', async (req, res) => {
+  const messages = await listConversationMessages(req.params.conversationId);
+  res.json(messages.map((m) => m.toJSON()));
+});
+
+// Whether both people have opened (connected to) the chat yet.
+router.get('/conversations/:conversationId/status', async (req, res) => {
+  const state = await getPairingConnectState(req.params.conversationId);
+  res.json(state);
+});
+
+// ─── Insights (real per-user statistics) ──────────────────────────────────────
+
+router.get('/insights/:userId', async (req, res) => {
+  try {
+    const summary = await computeInsights(req.params.userId);
+    res.json(summary);
+  } catch (e: any) {
+    res.status(400).json({ error: e?.message ?? 'Failed to compute insights' });
+  }
+});
+
+router.post('/conversations/:conversationId/messages', async (req, res) => {
+  try {
+    const { senderId, text } = req.body;
+    if (!senderId || !text) {
+      res.status(400).json({ error: 'senderId and text are required' });
+      return;
+    }
+    const msg = await recordConversationMessage({
+      conversationId: req.params.conversationId,
+      senderId,
+      text,
+    });
+    res.status(201).json(msg.toJSON());
+  } catch (e: any) {
+    res.status(400).json({ error: e?.message ?? 'Failed to send message' });
+  }
 });

@@ -84,3 +84,32 @@ export async function listMatchesForUser(
 ): Promise<MatchDoc[]> {
   return MatchModel.find({ userId }).sort({ createdAt: -1 }).limit(limit);
 }
+
+/**
+ * End BOTH sides of a mutual pairing (skip). Sets every match sharing the
+ * given conversationId to 'skipped', so neither person stays paired.
+ */
+export async function skipPairing(conversationId: string): Promise<number> {
+  const result = await MatchModel.updateMany(
+    { conversationId, status: { $in: ['pending_reveal', 'active', 'connected'] } },
+    { status: 'skipped' }
+  );
+  return result.modifiedCount;
+}
+
+/**
+ * How many sides of a mutual pairing have tapped "Open Chat" (status connected).
+ * bothConnected is true only when BOTH people have opened the chat.
+ */
+export async function getPairingConnectState(conversationId: string): Promise<{
+  total: number;
+  connected: number;
+  bothConnected: boolean;
+}> {
+  const total = await MatchModel.countDocuments({ conversationId });
+  const connected = await MatchModel.countDocuments({
+    conversationId,
+    status: 'connected',
+  });
+  return { total, connected, bothConnected: connected >= 2 };
+}
