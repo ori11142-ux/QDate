@@ -51,12 +51,12 @@ function photosFor(img: number): string[] {
 }
 
 const LOOK_TAG_SETS = [
-  ['natural_style', 'playful_energy'],
-  ['polished_style', 'confident_presence'],
-  ['expressive_style', 'creative_arts'],
-  ['minimalist_style', 'confident_presence'],
-  ['outdoor_energy', 'natural_style'],
-  ['active_lifestyle', 'playful_energy'],
+  ['blonde', 'light_skin'],
+  ['dark_hair', 'athletic_build'],
+  ['red_hair', 'curvy_build'],
+  ['dark_skin', 'clean_cut'],
+  ['light_brown_hair', 'slim_build'],
+  ['blonde', 'tall', 'medium_skin'],
 ];
 
 // Five interests per profile, drawn from the user-selectable catalog.

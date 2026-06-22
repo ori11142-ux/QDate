@@ -70,7 +70,7 @@ async function main() {
     },
   });
   user.set('interestTags', ['intellectual_curiosity', 'creative_arts']);
-  user.set('appearanceTags', ['polished_style', 'confident_presence']);
+  user.set('appearanceTags', ['dark_hair', 'athletic_build']);
   await user.save();
   console.log('created user', { id: user.id, email: user.email });
 
@@ -91,7 +91,7 @@ async function main() {
     },
   });
   candidate.set('interestTags', ['intellectual_curiosity', 'creative_arts']);
-  candidate.set('appearanceTags', ['polished_style', 'confident_presence']);
+  candidate.set('appearanceTags', ['dark_hair', 'athletic_build']);
   await candidate.save();
 
   const incompatible = await createUser({
@@ -106,7 +106,7 @@ async function main() {
     },
   });
   incompatible.set('interestTags', ['adventure', 'active_lifestyle']);
-  incompatible.set('appearanceTags', ['natural_style', 'outdoor_energy']);
+  incompatible.set('appearanceTags', ['blonde', 'slim_build']);
   await incompatible.save();
   const match = await createMatch({
     userId: user._id,
