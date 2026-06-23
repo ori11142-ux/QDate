@@ -4,7 +4,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -60,8 +59,8 @@ export function RegisterScreen({ navigation, route }: Props) {
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <View style={styles.topBar}>
+    <View style={styles.safe}>
+      <View style={[styles.topBar, { paddingTop: insets.top + spacing.sm }]}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={12}>
           <Text style={styles.back}>‹</Text>
         </Pressable>
@@ -149,7 +148,7 @@ export function RegisterScreen({ navigation, route }: Props) {
           <PrimaryButton title="Continue" onPress={handleContinue} disabled={!isValid} />
         </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }
 

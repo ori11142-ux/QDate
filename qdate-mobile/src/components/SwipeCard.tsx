@@ -25,12 +25,40 @@ interface Props {
 export function SwipeCard({ children, onSwipeLeft, onSwipeRight, stackIndex = 0 }: Props) {
   const pan = useRef(new Animated.ValueXY()).current;
 
+  // The PanResponder is created ONCE. A card that mounts as a background card
+  // (stackIndex > 0) later becomes the top card when the cards above it are
+  // swiped away — so the responder must read the *latest* stackIndex/callbacks
+  // through refs, otherwise it keeps the stale values from first mount and the
+  // new top card silently stops responding to drags.
+  const stackIndexRef = useRef(stackIndex);
+  const onSwipeLeftRef = useRef(onSwipeLeft);
+  const onSwipeRightRef = useRef(onSwipeRight);
+  stackIndexRef.current = stackIndex;
+  onSwipeLeftRef.current = onSwipeLeft;
+  onSwipeRightRef.current = onSwipeRight;
+
+  function forceSwipe(direction: 'left' | 'right') {
+    const x = direction === 'right' ? SCREEN_WIDTH * 1.6 : -SCREEN_WIDTH * 1.6;
+    Animated.timing(pan, {
+      toValue: { x, y: 0 },
+      duration: SWIPE_OUT_DURATION,
+      useNativeDriver: false,
+    }).start(() => {
+      // Advance the deck. We deliberately DON'T reset pan back to {0,0}: this
+      // card unmounts off-screen on the next render (its key leaves the slice),
+      // and resetting while it's still mounted snaps it back to center for a
+      // frame — that was the "previous profile" flash.
+      if (direction === 'right') onSwipeRightRef.current();
+      else onSwipeLeftRef.current();
+    });
+  }
+
   // Top card uses gestures; cards behind are decorative.
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => stackIndex === 0,
+      onStartShouldSetPanResponder: () => stackIndexRef.current === 0,
       onMoveShouldSetPanResponder: (_, g) =>
-        stackIndex === 0 && (Math.abs(g.dx) > 4 || Math.abs(g.dy) > 4),
+        stackIndexRef.current === 0 && (Math.abs(g.dx) > 4 || Math.abs(g.dy) > 4),
       onPanResponderMove: (_, g) => {
         pan.setValue({ x: g.dx, y: g.dy });
       },
@@ -49,19 +77,6 @@ export function SwipeCard({ children, onSwipeLeft, onSwipeRight, stackIndex = 0 
       },
     })
   ).current;
-
-  function forceSwipe(direction: 'left' | 'right') {
-    const x = direction === 'right' ? SCREEN_WIDTH * 1.6 : -SCREEN_WIDTH * 1.6;
-    Animated.timing(pan, {
-      toValue: { x, y: 0 },
-      duration: SWIPE_OUT_DURATION,
-      useNativeDriver: false,
-    }).start(() => {
-      pan.setValue({ x: 0, y: 0 });
-      if (direction === 'right') onSwipeRight();
-      else onSwipeLeft();
-    });
-  }
 
   const rotation = pan.x.interpolate({
     inputRange: [-SCREEN_WIDTH / 2, 0, SCREEN_WIDTH / 2],

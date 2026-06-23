@@ -122,7 +122,7 @@ export function DiscoverScreen() {
               const isInterest = mode === 'interests';
               return (
                 <SwipeCard
-                  key={card.id}
+                  key={`${mode}-${card.id}`}
                   stackIndex={stackIndex}
                   onSwipeLeft={() => handleSwipe(false, card.id)}
                   onSwipeRight={() => handleSwipe(true, card.id)}
@@ -213,13 +213,17 @@ function InterestCardBody({ card }: { card: InterestCard }) {
       <View style={interestStyles.chips}>
         {tags.map((tag) => (
           <View key={tag} style={interestStyles.chip}>
-            <Text style={interestStyles.chipText}>
+            <Text style={interestStyles.chipText} numberOfLines={1}>
               {interestEmoji(tag)} {interestLabel(tag)}
             </Text>
           </View>
         ))}
       </View>
-      {card.bio ? <Text style={interestStyles.bio}>“{card.bio}”</Text> : null}
+      {card.bio ? (
+        <Text style={interestStyles.bio} numberOfLines={3}>
+          “{card.bio}”
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -376,7 +380,8 @@ const interestStyles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: spacing.xl,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
     gap: spacing.md,
     backgroundColor: colors.surfaceMuted,
   },
@@ -393,21 +398,21 @@ const interestStyles = StyleSheet.create({
     justifyContent: 'center',
   },
   chip: {
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.xs,
     paddingHorizontal: spacing.md,
     borderRadius: radius.pill,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  chipText: { ...typography.body, color: colors.text },
+  chipText: { ...typography.caption, color: colors.text },
   bio: {
-    ...typography.body,
+    ...typography.caption,
     color: colors.textMuted,
     textAlign: 'center',
     fontStyle: 'italic',
-    lineHeight: 22,
-    marginTop: spacing.sm,
+    lineHeight: 20,
+    marginTop: spacing.xs,
   },
 });
 

@@ -3,7 +3,6 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Alert,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -120,8 +119,8 @@ export function EditProfileScreen({ navigation }: Props) {
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <View style={styles.topBar}>
+    <View style={styles.safe}>
+      <View style={[styles.topBar, { paddingTop: insets.top + spacing.sm }]}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={10}>
           <Text style={styles.back}>‹ Back</Text>
         </Pressable>
@@ -238,7 +237,7 @@ export function EditProfileScreen({ navigation }: Props) {
           loading={saving}
         />
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 

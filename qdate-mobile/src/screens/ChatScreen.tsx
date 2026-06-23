@@ -4,10 +4,8 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
-  KeyboardAvoidingView,
-  Platform,
+  Keyboard,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
@@ -38,8 +36,23 @@ export function ChatScreen({ navigation, route }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   const listRef = useRef<FlatList<ChatMessage>>(null);
+
+  // Manually lift the composer above the keyboard. KeyboardAvoidingView is
+  // unreliable under Android edge-to-edge (it left a dead gap when idle), so we
+  // reserve exactly the keyboard's height at the bottom of the body instead.
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', (e) =>
+      setKeyboardHeight(e.endCoordinates?.height ?? 0)
+    );
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardHeight(0));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
 
   // Mark MY side of the pairing connected as soon as I open the chat.
   useEffect(() => {
@@ -147,8 +160,8 @@ export function ChatScreen({ navigation, route }: Props) {
   const headerSub = bothConnected ? 'Connected' : 'Waiting to connect…';
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <View style={styles.header}>
+    <View style={styles.safe}>
+      <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={12}>
           <Text style={styles.back}>‹</Text>
         </Pressable>
@@ -165,10 +178,7 @@ export function ChatScreen({ navigation, route }: Props) {
         </View>
       </View>
 
-      <KeyboardAvoidingView
-        style={styles.body}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      <View style={[styles.body, { paddingBottom: keyboardHeight }]}>
         {checking ? (
           <View style={styles.center}>
             <ActivityIndicator color={colors.primary} />
@@ -203,7 +213,12 @@ export function ChatScreen({ navigation, route }: Props) {
         )}
 
         {bothConnected && (
-          <View style={[styles.composer, { paddingBottom: spacing.sm + insets.bottom }]}>
+          <View
+            style={[
+              styles.composer,
+              { paddingBottom: spacing.sm + (keyboardHeight > 0 ? 0 : insets.bottom) },
+            ]}
+          >
             <TextInput
               value={draft}
               onChangeText={setDraft}
@@ -229,8 +244,8 @@ export function ChatScreen({ navigation, route }: Props) {
             </Pressable>
           </View>
         )}
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+      </View>
+    </View>
   );
 }
 

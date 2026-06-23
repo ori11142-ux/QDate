@@ -3,7 +3,6 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Alert,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -110,8 +109,8 @@ export function OnboardingScreen({ route }: Props) {
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <View style={styles.topBar}>
+    <View style={styles.safe}>
+      <View style={[styles.topBar, { paddingTop: insets.top + spacing.sm }]}>
         <Text style={styles.stepLabel}>Step 2 of 2</Text>
       </View>
 
@@ -233,7 +232,7 @@ export function OnboardingScreen({ route }: Props) {
           loading={submitting}
         />
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
