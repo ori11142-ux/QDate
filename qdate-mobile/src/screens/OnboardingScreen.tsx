@@ -14,7 +14,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../auth/AuthContext';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { ProgressBar } from '../components/ProgressBar';
+import { GuidelinesAgreement } from '../components/CommunityGuidelines';
 import { INTEREST_OPTIONS, INTEREST_PICK_COUNT } from '../data/interests';
+import { GUIDELINES_VERSION } from '../data/guidelines';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import { Attraction, CommStyle, DatingIntent, Gender } from '../types';
 import { colors, radius, spacing, typography } from '../theme';
@@ -56,6 +58,7 @@ export function OnboardingScreen({ route }: Props) {
   const [gender, setGender] = useState<Gender | null>(null);
   const [attraction, setAttraction] = useState<Attraction | null>(null);
   const [interests, setInterests] = useState<string[]>([]);
+  const [agreedGuidelines, setAgreedGuidelines] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   function toggleInterest(tag: string) {
@@ -74,7 +77,7 @@ export function OnboardingScreen({ route }: Props) {
     attraction,
     interests.length === INTEREST_PICK_COUNT,
   ].filter(Boolean).length;
-  const ready = stepsComplete === 6;
+  const ready = stepsComplete === 6 && agreedGuidelines;
 
   async function handleStart() {
     if (!ready || submitting) return;
@@ -93,6 +96,8 @@ export function OnboardingScreen({ route }: Props) {
         interestTags: interests,
         gender,
         attraction,
+        guidelinesAccepted: agreedGuidelines,
+        guidelinesVersion: GUIDELINES_VERSION,
         profile: {
           intent: intent!,
           sharedIntellectImportance: intellect,
@@ -219,6 +224,12 @@ export function OnboardingScreen({ route }: Props) {
             );
           })}
         </View>
+
+        <Text style={styles.question}>Community Guidelines</Text>
+        <Text style={styles.subtitle}>
+          QDate is built on respect and safety. Please read and agree before you start.
+        </Text>
+        <GuidelinesAgreement agreed={agreedGuidelines} onAgreedChange={setAgreedGuidelines} />
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: spacing.lg + insets.bottom }]}>

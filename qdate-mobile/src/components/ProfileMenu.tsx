@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Image,
   Modal,
@@ -11,6 +11,7 @@ import {
 
 import { useAuth } from '../auth/AuthContext';
 import { interestEmoji, interestLabel } from '../data/interests';
+import { GuidelinesModal } from './CommunityGuidelines';
 import { colors, radius, spacing, typography } from '../theme';
 
 const INTENT_LABELS: Record<string, string> = {
@@ -40,6 +41,7 @@ interface Props {
 
 export function ProfileMenu({ visible, onClose, onEditProfile }: Props) {
   const { user, signOut } = useAuth();
+  const [guidelinesOpen, setGuidelinesOpen] = useState(false);
   if (!user) return null;
 
   const phaseLabel =
@@ -124,12 +126,21 @@ export function ProfileMenu({ visible, onClose, onEditProfile }: Props) {
             <Pressable style={styles.editBtn} onPress={onEditProfile}>
               <Text style={styles.editBtnText}>Edit profile</Text>
             </Pressable>
+            <Pressable
+              style={styles.guidelinesBtn}
+              onPress={() => setGuidelinesOpen(true)}
+              hitSlop={8}
+            >
+              <Text style={styles.guidelinesText}>Community Guidelines</Text>
+            </Pressable>
             <Pressable style={styles.signOutBtn} onPress={signOut} hitSlop={8}>
               <Text style={styles.signOutText}>Sign out</Text>
             </Pressable>
           </View>
         </Pressable>
       </Pressable>
+
+      <GuidelinesModal visible={guidelinesOpen} onClose={() => setGuidelinesOpen(false)} />
     </Modal>
   );
 }
@@ -254,6 +265,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   editBtnText: { ...typography.heading, color: colors.textInverse },
+  guidelinesBtn: { alignItems: 'center', paddingVertical: spacing.xs },
+  guidelinesText: { ...typography.body, color: colors.primaryDark, fontWeight: '600' },
   signOutBtn: { alignItems: 'center', paddingVertical: spacing.sm },
   signOutText: { ...typography.body, color: colors.danger, fontWeight: '600' },
 });
