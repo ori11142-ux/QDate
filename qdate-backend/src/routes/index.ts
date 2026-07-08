@@ -43,6 +43,13 @@ import {
   getLookCalibrationDeck,
 } from '../services/calibration';
 import { UserModel } from '../models/User';
+import { guidelinesPayload, GUIDELINES_VERSION } from '../data/guidelines';
+import {
+  acceptGuidelines,
+  submitReport,
+  getModerationStanding,
+  ModerationError,
+} from '../services/moderation';
 
 export const router = Router();
 const RATE_WINDOW_MS = 60 * 1000;
@@ -101,6 +108,8 @@ router.post('/auth/register', async (req, res) => {
       gender,
       attraction,
       profile,
+      guidelinesAccepted,
+      guidelinesVersion,
     } = req.body;
     if (!email || !name || !age || !password || !profile) {
       res
@@ -110,6 +119,11 @@ router.post('/auth/register', async (req, res) => {
     }
     if (!Array.isArray(photos) || photos.filter((p) => typeof p === 'string' && p).length !== 4) {
       res.status(400).json({ error: 'Exactly 4 profile photos are required' });
+      return;
+    }
+    // The user must agree to ("sign") the community guidelines to create an account.
+    if (guidelinesAccepted !== true) {
+      res.status(400).json({ error: 'You must accept the community guidelines to create an account' });
       return;
     }
     const user = await registerWithPassword({
@@ -125,6 +139,7 @@ router.post('/auth/register', async (req, res) => {
       gender,
       attraction,
       profile,
+      guidelinesVersion: typeof guidelinesVersion === 'string' ? guidelinesVersion : GUIDELINES_VERSION,
     });
     res.status(201).json(user.toJSON());
   } catch (e: any) {
@@ -148,6 +163,10 @@ router.post('/auth/login', async (req, res) => {
   } catch (e: any) {
     if (e instanceof AuthError && e.code === 'INVALID_CREDENTIALS') {
       res.status(401).json({ error: e.message });
+      return;
+    }
+    if (e instanceof AuthError && e.code === 'ACCOUNT_BLOCKED') {
+      res.status(403).json({ error: e.message });
       return;
     }
     res.status(400).json({ error: e?.message ?? 'Login failed' });
@@ -263,6 +282,78 @@ router.patch('/users/:id', async (req, res) => {
 // Catalog of selectable interests (shared with the mobile client).
 router.get('/interests', (_req, res) => {
   res.json(INTEREST_OPTIONS);
+});
+
+// ─── Guidelines & moderation ──────────────────────────────────────────────────
+
+// The community rules + report categories the mobile client renders.
+router.get('/guidelines', (_req, res) => {
+  res.json(guidelinesPayload());
+});
+
+// Record that a user has (re-)accepted the guidelines, e.g. after a version bump.
+router.post('/guidelines/accept', async (req, res) => {
+  try {
+    const userId = req.body.userId ?? req.body.user_id;
+    if (!parseObjectId(String(userId ?? ''))) {
+      res.status(400).json({ error: 'Valid userId is required' });
+      return;
+    }
+    const version = typeof req.body.version === 'string' ? req.body.version : GUIDELINES_VERSION;
+    const user = await acceptGuidelines(String(userId), version);
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+    res.json(user.toJSON());
+  } catch (e: any) {
+    res.status(400).json({ error: e?.message ?? 'Failed to accept guidelines' });
+  }
+});
+
+// File a report against another user. The reported user is derived from the
+// match/conversation the report was filed from; the automated rule check then
+// runs and the reported user's standing is recomputed.
+router.post('/reports', softRateLimit('reports', 20), async (req, res) => {
+  try {
+    const { reporterId, reportedUserId, matchId, conversationId, category, reason } = req.body;
+    if (!reporterId || !category) {
+      res.status(400).json({ error: 'reporterId and category are required' });
+      return;
+    }
+    const result = await submitReport({
+      reporterId: String(reporterId),
+      reportedUserId: reportedUserId ? String(reportedUserId) : undefined,
+      matchId: matchId ? String(matchId) : undefined,
+      conversationId: conversationId ? String(conversationId) : undefined,
+      category: String(category),
+      reason: typeof reason === 'string' ? reason : undefined,
+    });
+    res.status(result.duplicate ? 200 : 201).json({
+      ok: true,
+      reportId: String(result.report._id),
+      status: result.report.status,
+      violatesRules: result.report.violatesRules,
+      alreadyReported: result.duplicate,
+    });
+  } catch (e: any) {
+    if (e instanceof ModerationError) {
+      const status = e.code === 'INVALID_CATEGORY' || e.code === 'SELF_REPORT' ? 400 : 404;
+      res.status(status).json({ error: e.message });
+      return;
+    }
+    res.status(400).json({ error: e?.message ?? 'Failed to submit report' });
+  }
+});
+
+// Debug/admin: a user's current moderation standing.
+router.get('/moderation/:userId', async (req, res) => {
+  const standing = await getModerationStanding(req.params.userId);
+  if (!standing) {
+    res.status(404).json({ error: 'Not found' });
+    return;
+  }
+  res.json(standing);
 });
 
 // ─── Matches ────────────────────────────────────────────────────────────────

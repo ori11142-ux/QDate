@@ -6,6 +6,7 @@ export const AUTH_METHODS = ['email', 'apple'] as const;
 export const PHASES = ['phase_1', 'phase_2'] as const;
 export const GENDERS = ['man', 'woman'] as const;
 export const ATTRACTIONS = ['men', 'women', 'both'] as const;
+export const MODERATION_STATUSES = ['active', 'warned', 'suspended', 'banned'] as const;
 
 const userSchema = new Schema(
   {
@@ -48,6 +49,16 @@ const userSchema = new Schema(
     intentScore: { type: Number, min: 0, max: 10, default: 5 },
     lastActiveAt: { type: Date, default: () => new Date() },
     cooldownUntil: { type: Date, default: null },
+
+    // Community guidelines the user agreed to ("signed") at sign-up.
+    guidelinesAcceptedVersion: { type: String, default: null },
+    guidelinesAcceptedAt: { type: Date, default: null },
+
+    // Moderation standing, driven by reports (see services/moderation.ts).
+    // strikeCount is a weighted, distinct-reporter score, not a raw count.
+    moderationStatus: { type: String, enum: MODERATION_STATUSES, default: 'active', index: true },
+    strikeCount: { type: Number, default: 0, min: 0 },
+    suspendedUntil: { type: Date, default: null },
 
     // Optional structured tags used by the matching model.
     interestTags: { type: [String], default: [] },

@@ -123,6 +123,27 @@ export type RegisterPayload = {
   gender?: 'man' | 'woman' | null;
   attraction?: 'men' | 'women' | 'both' | null;
   profile: BackendUser['profile'];
+  // The user "signs" the community guidelines during onboarding.
+  guidelinesAccepted: boolean;
+  guidelinesVersion: string;
+};
+
+export type ReportPayload = {
+  reporterId: string;
+  category: string;
+  reason?: string;
+  // At least one of these so the backend can identify who is being reported.
+  reportedUserId?: string;
+  matchId?: string;
+  conversationId?: string;
+};
+
+export type ReportResult = {
+  ok: boolean;
+  reportId: string;
+  status: string;
+  violatesRules: boolean;
+  alreadyReported: boolean;
 };
 
 export const api = {
@@ -145,6 +166,14 @@ export const api = {
     return request<BackendUser>(`/users/${userId}`, {
       method: 'PATCH',
       body: JSON.stringify(updates),
+    });
+  },
+
+  // ── Reporting / moderation ────────────────────────────────────────────────
+  async reportUser(payload: ReportPayload): Promise<ReportResult> {
+    return request<ReportResult>('/reports', {
+      method: 'POST',
+      body: JSON.stringify(payload),
     });
   },
 

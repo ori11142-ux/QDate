@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   Keyboard,
@@ -16,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { api } from '../api';
 import { useAuth } from '../auth/AuthContext';
+import { ReportUserModal } from '../components/ReportUserModal';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import { ChatMessage } from '../types';
 import { colors, radius, spacing, typography } from '../theme';
@@ -37,6 +39,8 @@ export function ChatScreen({ navigation, route }: Props) {
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportSubmitting, setReportSubmitting] = useState(false);
 
   const listRef = useRef<FlatList<ChatMessage>>(null);
 
@@ -156,6 +160,31 @@ export function ChatScreen({ navigation, route }: Props) {
     }
   }
 
+  async function handleSubmitReport(category: string, reason: string) {
+    if (reportSubmitting) return;
+    setReportSubmitting(true);
+    try {
+      const result = await api.reportUser({
+        reporterId: userId,
+        matchId,
+        conversationId,
+        category,
+        reason: reason || undefined,
+      });
+      setReportOpen(false);
+      Alert.alert(
+        'Report submitted',
+        result.alreadyReported
+          ? "You've already reported this person — our team is reviewing it."
+          : "Thanks for letting us know. We'll review this against our community guidelines.",
+      );
+    } catch (e: any) {
+      Alert.alert('Could not submit report', e?.message ?? 'Please try again.');
+    } finally {
+      setReportSubmitting(false);
+    }
+  }
+
   const headerInitial = (candidateName ?? '?')[0]?.toUpperCase() ?? '?';
   const headerSub = bothConnected ? 'Connected' : 'Waiting to connect…';
 
@@ -176,6 +205,9 @@ export function ChatScreen({ navigation, route }: Props) {
           <Text style={styles.headerName}>{candidateName ?? 'Your match'}</Text>
           <Text style={styles.headerSub}>{headerSub}</Text>
         </View>
+        <Pressable onPress={() => setReportOpen(true)} hitSlop={12} style={styles.reportBtn}>
+          <Text style={styles.reportIcon}>⚑</Text>
+        </Pressable>
       </View>
 
       <View style={[styles.body, { paddingBottom: keyboardHeight }]}>
@@ -245,6 +277,14 @@ export function ChatScreen({ navigation, route }: Props) {
           </View>
         )}
       </View>
+
+      <ReportUserModal
+        visible={reportOpen}
+        reportedName={candidateName}
+        submitting={reportSubmitting}
+        onClose={() => setReportOpen(false)}
+        onSubmit={handleSubmitReport}
+      />
     </View>
   );
 }
@@ -295,6 +335,8 @@ const styles = StyleSheet.create({
   headerCenter: { flex: 1 },
   headerName: { ...typography.heading, color: colors.text },
   headerSub: { ...typography.caption, color: colors.textMuted },
+  reportBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  reportIcon: { fontSize: 20, color: colors.textMuted },
 
   body: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },

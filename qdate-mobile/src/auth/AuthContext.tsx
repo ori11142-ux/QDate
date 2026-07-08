@@ -15,6 +15,8 @@ export type RegisterInput = {
   interestTags?: string[];
   gender?: 'man' | 'woman' | null;
   attraction?: 'men' | 'women' | 'both' | null;
+  guidelinesAccepted: boolean;
+  guidelinesVersion: string;
   profile: {
     intent: 'long_term' | 'casual' | 'explore' | 'friendship';
     sharedIntellectImportance: number;
