@@ -81,12 +81,13 @@ export interface BackendUser {
   name: string;
   email: string;
   age: number;
-  authMethod: 'email' | 'apple';
+  authMethod: 'email' | 'apple' | 'google';
   photoUrl: string | null;
   photos: string[];
   bio: string;
   gender: 'man' | 'woman' | null;
   attraction: 'men' | 'women' | 'both' | null;
+  agePreference: { min: number; max: number };
   profile: {
     intent: 'long_term' | 'casual' | 'explore' | 'friendship';
     sharedIntellectImportance: number;
@@ -105,6 +106,7 @@ export type ProfileUpdatePayload = {
   age?: number;
   gender?: 'man' | 'woman' | null;
   attraction?: 'men' | 'women' | 'both' | null;
+  agePreference?: { min: number; max: number };
   photos?: string[];
   bio?: string;
   profile?: BackendUser['profile'];
@@ -115,17 +117,20 @@ export type RegisterPayload = {
   email: string;
   name: string;
   age: number;
-  authMethod: 'email' | 'apple';
+  authMethod: 'email' | 'apple' | 'google';
   password: string;
   photos: string[];
   bio?: string;
   interestTags?: string[];
   gender?: 'man' | 'woman' | null;
   attraction?: 'men' | 'women' | 'both' | null;
+  agePreference: { min: number; max: number };
   profile: BackendUser['profile'];
   // The user "signs" the community guidelines during onboarding.
   guidelinesAccepted: boolean;
   guidelinesVersion: string;
+  // Optional opt-in to biometric (face) processing.
+  biometricConsent: boolean;
 };
 
 export type ReportPayload = {
@@ -179,8 +184,13 @@ export const api = {
 
   // ── Matches / insights / calibration — mockable for now ───────────────────
   // ── Matches — REAL backend (heuristic matcher) ────────────────────────────
-  async generateDailyMatch(userId: string): Promise<Match> {
-    return request<Match>('/match/daily_generate', {
+  // Returns the match if one is available, or { match: null, cooldownUntil } —
+  // where cooldownUntil is set when the user is in a phase-2 skip cooldown, so
+  // the client can show a countdown that survives reloads.
+  async generateDailyMatch(
+    userId: string
+  ): Promise<{ match: Match | null; cooldownUntil: string | null }> {
+    return request<{ match: Match | null; cooldownUntil: string | null }>('/match/daily_generate', {
       method: 'POST',
       body: JSON.stringify({ user_id: userId }),
     });

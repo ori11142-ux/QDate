@@ -15,6 +15,7 @@ export interface StoredUser {
   bio: string;
   gender: 'man' | 'woman' | null;
   attraction: 'men' | 'women' | 'both' | null;
+  agePreference: { min: number; max: number };
   profile: IntentProfile;
   interestTags: string[];
   currentPhase: Phase;
@@ -38,6 +39,7 @@ export async function loadUser(): Promise<StoredUser | null> {
       bio: parsed.bio ?? '',
       gender: parsed.gender ?? null,
       attraction: parsed.attraction ?? null,
+      agePreference: parsed.agePreference ?? { min: 18, max: 99 },
       profile: parsed.profile ?? {
         intent: 'long_term',
         sharedIntellectImportance: 3,

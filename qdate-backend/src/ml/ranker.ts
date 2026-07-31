@@ -8,6 +8,7 @@ import {
   preferenceAlignment,
   preferenceVectorSimilarity,
 } from './features';
+import { faceTasteBlendTerm, getGlobalUsableTasteUsers } from './faceTaste';
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
@@ -16,6 +17,14 @@ function clamp(value: number, min: number, max: number): number {
 function compatibilityByDiff(diff: number, maxDiff: number): number {
   if (maxDiff <= 0) return 0;
   return clamp(1 - diff / maxDiff, 0, 1);
+}
+
+/** Overlap of two selected-tag sets: |A∩B| / max(|A|,|B|). Neutral 0.5 if either is empty. */
+function tagOverlap(a: string[], b: string[]): number {
+  if (a.length === 0 || b.length === 0) return 0.5;
+  const setB = new Set(b);
+  const inter = a.filter((t) => setB.has(t)).length;
+  return inter / Math.max(a.length, b.length);
 }
 
 function commStyleCompatibility(a: UserFeatureVector['commStyle'], b: UserFeatureVector['commStyle']): number {
@@ -48,17 +57,21 @@ type LearnedWeights = {
   outcomeConfidence: number;
 };
 
+// Weights are normalized before use, so these are relative importances.
+// Appearance (looks) and shared interests are deliberately prominent here:
+// looks is driven by the learned face-taste model, interests by shared-tag
+// overlap + learned interest preference.
 const BASE_WEIGHTS: LearnedWeights = {
   intent: 0.2,
-  commStyle: 0.14,
+  commStyle: 0.12,
   age: 0.08,
-  intellect: 0.08,
-  activityOverlap: 0.1,
-  cadence: 0.1,
-  engagement: 0.08,
-  interests: 0.11,
-  looks: 0.08,
-  outcomeConfidence: 0.03,
+  intellect: 0.06,
+  activityOverlap: 0.04,
+  cadence: 0.05,
+  engagement: 0.03,
+  interests: 0.18,
+  looks: 0.2,
+  outcomeConfidence: 0.04,
 };
 
 function normalizeWeights(weights: LearnedWeights): LearnedWeights {
@@ -69,7 +82,8 @@ function normalizeWeights(weights: LearnedWeights): LearnedWeights {
   ) as LearnedWeights;
 }
 
-async function learnWeightsFromOutcomes(): Promise<LearnedWeights> {
+// Exported for the eval/demo harnesses (evalFaceTaste.ts, demoMatching.ts).
+export async function learnWeightsFromOutcomes(): Promise<LearnedWeights> {
   const [matchAgg, feedbackAgg] = await Promise.all([
     MatchModel.aggregate([
       { $match: { status: { $in: ['connected', 'skipped', 'expired'] } } },
@@ -110,27 +124,32 @@ async function learnWeightsFromOutcomes(): Promise<LearnedWeights> {
   const willingness = (feedback?.willingnessAvg ?? 3) / 5;
   const communication = (feedback?.communicationAvg ?? 3) / 5;
 
+  // MULTIPLICATIVE adjustments (relative to each base), so learning perturbs
+  // every weight PROPORTIONALLY. Fixed additive bumps would inflate small-base
+  // weights (e.g. engagement 0.03 → +60%) while barely moving large ones
+  // (looks 0.20), and after normalization could push the deliberately-prominent
+  // looks/interests below their base — reversing the intended balance.
   const learned: LearnedWeights = {
     ...BASE_WEIGHTS,
-    intent: BASE_WEIGHTS.intent + connectedRate * 0.06,
-    commStyle: BASE_WEIGHTS.commStyle + communication * 0.04,
-    cadence: BASE_WEIGHTS.cadence + (1 - inactiveRate) * 0.03,
-    engagement: BASE_WEIGHTS.engagement + communication * 0.03,
-    interests: BASE_WEIGHTS.interests + willingness * 0.03,
-    looks: BASE_WEIGHTS.looks + willingness * 0.02,
-    outcomeConfidence: BASE_WEIGHTS.outcomeConfidence + connectedRate * 0.02,
-    age: BASE_WEIGHTS.age,
-    intellect: BASE_WEIGHTS.intellect,
-    activityOverlap: BASE_WEIGHTS.activityOverlap,
+    intent: BASE_WEIGHTS.intent * (1 + connectedRate * 0.3),
+    commStyle: BASE_WEIGHTS.commStyle * (1 + communication * 0.3),
+    cadence: BASE_WEIGHTS.cadence * (1 + (1 - inactiveRate) * 0.3),
+    engagement: BASE_WEIGHTS.engagement * (1 + communication * 0.3),
+    interests: BASE_WEIGHTS.interests * (1 + willingness * 0.25),
+    looks: BASE_WEIGHTS.looks * (1 + willingness * 0.2),
+    outcomeConfidence: BASE_WEIGHTS.outcomeConfidence * (1 + connectedRate * 0.5),
   };
 
   return normalizeWeights(learned);
 }
 
-function scoreFromFeatures(
+// Exported (with an explicit global-taste-users arg) so tooling can score a pair
+// with the taste blend forced off vs on. Production goes through scoreCandidateWithLearning.
+export function scoreFromFeatures(
   requester: UserFeatureVector,
   candidate: UserFeatureVector,
-  learnedWeights: LearnedWeights
+  learnedWeights: LearnedWeights,
+  globalUsableTasteUsers: number
 ): number {
   const intentCompat = requester.intent === candidate.intent ? 1 : 0.4;
   const commCompat = commStyleCompatibility(requester.commStyle, candidate.commStyle);
@@ -153,17 +172,31 @@ function scoreFromFeatures(
     120
   );
 
-  const interestsCompat =
+  // Direct overlap of the two people's SELECTED interests — this always applies,
+  // even before any interests-calibration swipes exist. (The learned interest
+  // preference below is neutral 0.5 until a user swipes the interests deck, so
+  // without this term, the interests people pick at onboarding never affected
+  // the match score.) The learned preference refines it once signal exists.
+  const interestOverlap = tagOverlap(requester.interestTags, candidate.interestTags);
+  const learnedInterests =
     (preferenceAlignment(requester.interestsPreference, candidate.interestTags) +
-      preferenceAlignment(candidate.interestsPreference, requester.interestTags) +
-      preferenceVectorSimilarity(requester.interestsPreference, candidate.interestsPreference)) /
-    3;
+      preferenceAlignment(candidate.interestsPreference, requester.interestTags)) /
+    2;
+  const interestsCompat = 0.6 * interestOverlap + 0.4 * learnedInterests;
 
-  const looksCompat =
+  // Phase 1 tag-based looks term (unchanged).
+  const tagLooks =
     (preferenceAlignment(requester.looksPreference, candidate.appearanceTags) +
       preferenceAlignment(candidate.looksPreference, requester.appearanceTags) +
       preferenceVectorSimilarity(requester.looksPreference, candidate.looksPreference)) /
     3;
+
+  // Phase 2: blend in the learned mutual face-taste when there's enough signal.
+  // beta===0 (cold-start, or no computable direction) → looksCompat === tagLooks
+  // exactly, so the Phase-1 score is reproduced byte-for-byte.
+  const { mutualEmb, beta } = faceTasteBlendTerm(requester, candidate, globalUsableTasteUsers);
+  const looksCompat =
+    mutualEmb == null || beta === 0 ? tagLooks : (1 - beta) * tagLooks + beta * mutualEmb;
 
   const outcomeConfidence =
     ((requester.feedbackWillingnessAvg ?? 3) + (candidate.feedbackWillingnessAvg ?? 3)) / 10;
@@ -236,13 +269,14 @@ export async function scoreCandidateWithLearning(
   requester: UserDoc,
   candidate: UserDoc
 ): Promise<number> {
-  const [requesterFeatures, candidateFeatures, weights] = await Promise.all([
+  const [requesterFeatures, candidateFeatures, weights, globalUsableTasteUsers] = await Promise.all([
     extractUserFeatures(requester),
     extractUserFeatures(candidate),
     learnWeightsFromOutcomes(),
+    getGlobalUsableTasteUsers(),
   ]);
 
-  return scoreFromFeatures(requesterFeatures, candidateFeatures, weights);
+  return scoreFromFeatures(requesterFeatures, candidateFeatures, weights, globalUsableTasteUsers);
 }
 
 export function scoreCandidateHeuristicML(requester: UserDoc, candidate: UserDoc): number {

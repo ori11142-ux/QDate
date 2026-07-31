@@ -17,6 +17,9 @@ export interface Match {
   matchId: string;
   conversationId?: string;
   status?: 'pending_reveal' | 'active' | 'connected' | 'skipped' | 'expired';
+  // The phase this match belongs to — the client syncs its local phase to this
+  // so an aged (phase-2) user is never stranded by a stale local phase.
+  phase?: Phase;
   candidateName: string;
   candidateAge: number;
   candidateBio: string;
@@ -56,6 +59,13 @@ export interface InsightsSummary {
     skipped: number;
     expired: number;
     pendingOrActive: number;
+  };
+  activity: {
+    interestSwipes: number;
+    lookSwipes: number;
+    matches: number;
+    connections: number;
+    messagesSent: number;
   };
   calibration: { interests: number | null; looks: number | null };
   reflections: { matchId: string; name: string; age: number; reason: string }[];

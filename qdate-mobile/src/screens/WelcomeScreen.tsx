@@ -12,7 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PrimaryButton } from '../components/PrimaryButton';
 import { RootStackParamList } from '../navigation/RootNavigator';
-import { colors, spacing, typography } from '../theme';
+import { colors, radius, spacing, typography } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Welcome'>;
 
@@ -64,6 +64,13 @@ export function WelcomeScreen({ navigation }: Props) {
             title="Create account"
             onPress={() => navigation.navigate('Register', { authMethod: 'email' })}
           />
+          <Pressable
+            style={({ pressed }) => [styles.googleBtn, pressed && styles.googlePressed]}
+            onPress={() => navigation.navigate('Register', { authMethod: 'google' })}
+          >
+            <Text style={styles.googleG}>G</Text>
+            <Text style={styles.googleLabel}>Continue with Google</Text>
+          </Pressable>
           <PrimaryButton
             title="Log in"
             variant="outline"
@@ -103,4 +110,19 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   actions: { gap: spacing.md, marginBottom: spacing.lg },
+  googleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    minHeight: 52,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.pill,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#DADCE0',
+  },
+  googlePressed: { opacity: 0.85 },
+  googleG: { fontSize: 20, fontWeight: '700', color: '#4285F4' },
+  googleLabel: { ...typography.heading, color: '#3C4043' },
 });

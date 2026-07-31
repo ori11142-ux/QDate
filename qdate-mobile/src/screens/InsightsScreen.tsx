@@ -1,8 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   ActivityIndicator,
-  Alert,
-  Pressable,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -16,28 +15,25 @@ import { InsightsSummary } from '../types';
 import { colors, radius, spacing, typography } from '../theme';
 
 export function InsightsScreen() {
-  const { user, signOut, togglePhase } = useAuth();
+  const { user } = useAuth();
   const [insights, setInsights] = useState<InsightsSummary | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let active = true;
-    api
-      .getInsights(user?.id ?? '')
-      .then((d) => active && setInsights(d))
-      .catch(() => active && setInsights(null))
-      .finally(() => active && setLoading(false));
-    return () => {
-      active = false;
-    };
-  }, [user?.id]);
-
-  function handleSignOutPress() {
-    Alert.alert('Sign out?', "You'll need to register again to receive matches.", [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign out', style: 'destructive', onPress: () => signOut() },
-    ]);
-  }
+  // Refetch every time the Insights tab gains focus, so counts/intent reflect
+  // activity done elsewhere (swipes, matches, skips) without a manual reload.
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      api
+        .getInsights(user?.id ?? '')
+        .then((d) => active && setInsights(d))
+        .catch(() => active && setInsights(null))
+        .finally(() => active && setLoading(false));
+      return () => {
+        active = false;
+      };
+    }, [user?.id])
+  );
 
   if (loading) {
     return (
@@ -47,11 +43,6 @@ export function InsightsScreen() {
     );
   }
 
-  const nextPhaseLabel =
-    user?.currentPhase === 'phase_1'
-      ? 'Switch to Phase 2 (demo)'
-      : 'Switch to Phase 1 (demo)';
-
   const o = insights?.matchOutcomes ?? {
     connected: 0,
     skipped: 0,
@@ -60,6 +51,14 @@ export function InsightsScreen() {
   };
   const matchTotal = o.connected + o.skipped + o.expired + o.pendingOrActive;
   const pct = (n: number) => (matchTotal > 0 ? Math.round((100 * n) / matchTotal) : 0);
+
+  const a = insights?.activity ?? {
+    interestSwipes: 0,
+    lookSwipes: 0,
+    matches: 0,
+    connections: 0,
+    messagesSent: 0,
+  };
 
   const interestsPct =
     insights?.calibration.interests != null
@@ -84,6 +83,13 @@ export function InsightsScreen() {
         </Text>
 
         <Text style={styles.sectionTitle}>Your Activity</Text>
+        <View style={styles.activityGrid}>
+          <ActivityTile value={a.interestSwipes} label="Interest swipes" />
+          <ActivityTile value={a.lookSwipes} label="Looks swipes" />
+          <ActivityTile value={a.matches} label="Matches" />
+          <ActivityTile value={a.connections} label="Connections" />
+          <ActivityTile value={a.messagesSent} label="Messages sent" />
+        </View>
         <View style={styles.metricRow}>
           <View style={styles.metricCard}>
             <Text style={styles.metricLabel}>Match Outcomes</Text>
@@ -161,17 +167,17 @@ export function InsightsScreen() {
           </Text>
           <Text style={styles.intentCaption}>Updated from your real activity</Text>
         </View>
-
-        <View style={styles.footerLinks}>
-          <Pressable onPress={togglePhase} style={styles.linkBtn} hitSlop={8}>
-            <Text style={styles.linkLabel}>{nextPhaseLabel}</Text>
-          </Pressable>
-          <Pressable onPress={handleSignOutPress} style={styles.linkBtn} hitSlop={8}>
-            <Text style={styles.linkLabel}>Sign out</Text>
-          </Pressable>
-        </View>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function ActivityTile({ value, label }: { value: number; label: string }) {
+  return (
+    <View style={styles.activityTile}>
+      <Text style={styles.activityValue}>{value}</Text>
+      <Text style={styles.activityTileLabel}>{label}</Text>
+    </View>
   );
 }
 
@@ -208,6 +214,25 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
     marginBottom: spacing.md,
   },
+
+  activityGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  activityTile: {
+    flexGrow: 1,
+    flexBasis: '30%',
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    alignItems: 'center',
+    gap: 2,
+  },
+  activityValue: { ...typography.title, color: colors.primary },
+  activityTileLabel: { ...typography.caption, color: colors.textMuted, textAlign: 'center' },
 
   metricRow: { flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' },
   metricCard: {
@@ -276,12 +301,4 @@ const styles = StyleSheet.create({
   intentValue: { ...typography.display, fontSize: 48, color: colors.primary },
   intentMax: { ...typography.title, color: colors.textMuted },
   intentCaption: { ...typography.caption, color: colors.textMuted },
-
-  footerLinks: { marginTop: spacing.xl, gap: spacing.sm, alignItems: 'center' },
-  linkBtn: { paddingVertical: spacing.sm },
-  linkLabel: {
-    ...typography.caption,
-    color: colors.textMuted,
-    textDecorationLine: 'underline',
-  },
 });

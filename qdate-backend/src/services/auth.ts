@@ -1,8 +1,9 @@
 import bcrypt from 'bcryptjs';
 import { UserModel, UserDoc } from '../models/User';
 import { sanitizeInterestTags } from '../data/interests';
-import { GUIDELINES_VERSION } from '../data/guidelines';
+import { GUIDELINES_VERSION, BIOMETRIC_CONSENT_VERSION } from '../data/guidelines';
 import { isBlocked } from './moderation';
+import { sanitizeAgePreference } from './users';
 
 const SALT_ROUNDS = 10;
 
@@ -19,7 +20,7 @@ export type RegisterInput = {
   email: string;
   name: string;
   age: number;
-  authMethod: 'email' | 'apple';
+  authMethod: 'email' | 'apple' | 'google';
   password: string;
   photoUrl?: string | null;
   photos?: string[];
@@ -27,8 +28,11 @@ export type RegisterInput = {
   interestTags?: string[];
   gender?: 'man' | 'woman' | null;
   attraction?: 'men' | 'women' | 'both' | null;
+  agePreference?: { min: number; max: number };
   // Version of the community guidelines the user agreed to at sign-up.
   guidelinesVersion?: string;
+  // Whether the user opted in to biometric (face) processing.
+  biometricConsent?: boolean;
   profile: {
     intent: 'long_term' | 'casual' | 'explore' | 'friendship';
     sharedIntellectImportance: number;
@@ -64,12 +68,16 @@ export async function registerWithPassword(input: RegisterInput): Promise<UserDo
     interestTags: sanitizeInterestTags(input.interestTags),
     gender: input.gender ?? null,
     attraction: input.attraction ?? null,
+    agePreference: sanitizeAgePreference(input.agePreference),
     passwordHash,
     profile: input.profile,
     // The registration route only reaches here once the user has agreed, so we
     // stamp the accepted version + timestamp as their "signature".
     guidelinesAcceptedVersion: input.guidelinesVersion ?? GUIDELINES_VERSION,
     guidelinesAcceptedAt: new Date(),
+    // Biometric consent is optional; only stamped when the user opted in.
+    biometricConsentVersion: input.biometricConsent ? BIOMETRIC_CONSENT_VERSION : null,
+    biometricConsentAt: input.biometricConsent ? new Date() : null,
   });
 }
 

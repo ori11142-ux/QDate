@@ -8,6 +8,25 @@
 
 export const GUIDELINES_VERSION = '1.0';
 
+// Separate, explicit consent for BIOMETRIC processing (the face signature the
+// face-taste matcher builds from a user's photo). Kept distinct from the general
+// guidelines because biometric data is a special category and consent must be
+// specific and opt-in. Declining is allowed — the user is then matched by
+// interests only, and no face embedding is computed for them.
+export const BIOMETRIC_CONSENT_VERSION = '1.0';
+
+export const BIOMETRIC_CONSENT = {
+  version: BIOMETRIC_CONSENT_VERSION,
+  title: 'Face-based matching',
+  summary: 'Let QDate analyze your photos to learn your visual taste and improve your matches.',
+  points: [
+    'We create a numeric "face signature" from your primary photo. It stays on our servers, is used only to match you, and is never shown to other members.',
+    'This is biometric data, so we ask for your explicit consent. It is optional — if you decline, you\'ll still be matched using your interests.',
+    'We never sell it or use it for anything other than matching.',
+    'You can withdraw consent and have this data deleted at any time — just ask.',
+  ],
+};
+
 export interface CommunityRule {
   id: string;
   title: string;
@@ -118,5 +137,6 @@ export function guidelinesPayload() {
     version: GUIDELINES_VERSION,
     rules: COMMUNITY_RULES,
     reportCategories: REPORT_CATEGORIES.map((c) => ({ id: c.id, label: c.label })),
+    biometricConsent: BIOMETRIC_CONSENT,
   };
 }

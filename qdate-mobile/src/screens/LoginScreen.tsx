@@ -1,10 +1,7 @@
 import React, { useState } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -13,6 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAuth } from '../auth/AuthContext';
+import { KeyboardAwareScrollView } from '../components/KeyboardAwareScrollView';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import { colors, radius, spacing, typography } from '../theme';
@@ -51,82 +49,72 @@ export function LoginScreen({ navigation }: Props) {
         </Pressable>
       </View>
 
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <ScrollView
-          contentContainerStyle={styles.scroll}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <Text style={styles.h1}>Welcome back</Text>
-          <Text style={styles.subtitle}>Log in to pick up where you left off.</Text>
+      <KeyboardAwareScrollView contentContainerStyle={styles.scroll}>
+        <Text style={styles.h1}>Welcome back</Text>
+        <Text style={styles.subtitle}>Log in to pick up where you left off.</Text>
 
-          <View style={styles.form}>
-            <View style={styles.field}>
-              <Text style={styles.label}>Email</Text>
-              <TextInput
-                value={email}
-                onChangeText={(v) => {
-                  setEmail(v);
-                  setError(null);
-                }}
-                placeholder="you@example.com"
-                placeholderTextColor={colors.textMuted}
-                style={styles.input}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-            </View>
-
-            <View style={styles.field}>
-              <Text style={styles.label}>Password</Text>
-              <TextInput
-                value={password}
-                onChangeText={(v) => {
-                  setPassword(v);
-                  setError(null);
-                }}
-                placeholder="Your password"
-                placeholderTextColor={colors.textMuted}
-                style={styles.input}
-                secureTextEntry
-                autoCapitalize="none"
-                onSubmitEditing={handleLogin}
-              />
-            </View>
-
-            {error ? <Text style={styles.error}>{error}</Text> : null}
+        <View style={styles.form}>
+          <View style={styles.field}>
+            <Text style={styles.label}>Email</Text>
+            <TextInput
+              value={email}
+              onChangeText={(v) => {
+                setEmail(v);
+                setError(null);
+              }}
+              placeholder="you@example.com"
+              placeholderTextColor={colors.textMuted}
+              style={styles.input}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
           </View>
-        </ScrollView>
 
-        <View style={styles.footer}>
-          <PrimaryButton
-            title="Log in"
-            onPress={handleLogin}
-            disabled={!canSubmit}
-            loading={submitting}
-          />
-          <Pressable
-            onPress={() => navigation.replace('Register', { authMethod: 'email' })}
-            hitSlop={8}
-            style={styles.signUpRow}
-          >
-            <Text style={styles.signUpText}>
-              No account yet? <Text style={styles.signUpLink}>Create one</Text>
-            </Text>
-          </Pressable>
+          <View style={styles.field}>
+            <Text style={styles.label}>Password</Text>
+            <TextInput
+              value={password}
+              onChangeText={(v) => {
+                setPassword(v);
+                setError(null);
+              }}
+              placeholder="Your password"
+              placeholderTextColor={colors.textMuted}
+              style={styles.input}
+              secureTextEntry
+              autoCapitalize="none"
+              onSubmitEditing={handleLogin}
+            />
+          </View>
+
+          {error ? <Text style={styles.error}>{error}</Text> : null}
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardAwareScrollView>
+
+      <View style={styles.footer}>
+        <PrimaryButton
+          title="Log in"
+          onPress={handleLogin}
+          disabled={!canSubmit}
+          loading={submitting}
+        />
+        <Pressable
+          onPress={() => navigation.replace('Register', { authMethod: 'email' })}
+          hitSlop={8}
+          style={styles.signUpRow}
+        >
+          <Text style={styles.signUpText}>
+            No account yet? <Text style={styles.signUpLink}>Create one</Text>
+          </Text>
+        </Pressable>
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
-  flex: { flex: 1 },
 
   topBar: {
     paddingHorizontal: spacing.lg,

@@ -1,7 +1,9 @@
 import { Types } from 'mongoose';
 import { UserDoc, UserModel } from '../models/User';
 import { MatchDoc, MatchModel } from '../models/Match';
-import { scoreCandidateHeuristicML, scoreCandidateWithLearning } from '../ml/ranker';
+import { scoreCandidateHeuristicML, scoreFromFeatures, learnWeightsFromOutcomes } from '../ml/ranker';
+import { extractUserFeatures, UserFeatureVector } from '../ml/features';
+import { getGlobalUsableTasteUsers } from '../ml/faceTaste';
 
 type Phase = 'phase_1' | 'phase_2';
 
@@ -9,6 +11,12 @@ const LEARNING_DAYS = 14;
 const PHASE2_CADENCE_DAYS = 7;
 const PHASE2_QUALITY_THRESHOLD = 72;
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+// A candidate "accepts" the requester when the requester scores at least this
+// fraction of that candidate's OWN best available option — so we don't pair
+// someone with a partner they'd clearly rather trade away. Reciprocity nudges
+// selection toward two-sided matches; it never blocks a match outright.
+const RECIPROCITY_FACTOR = 0.85;
 
 /**
  * Heuristic compatibility score between a requester and a candidate (0–100).
@@ -75,6 +83,36 @@ function genderCompatible(a: UserDoc, b: UserDoc): boolean {
   return aWantsB && bWantsA;
 }
 
+/** Each person must fall inside the OTHER's preferred age range (mutual). */
+export function ageCompatible(a: UserDoc, b: UserDoc): boolean {
+  const ap = (a.get('agePreference') as { min?: number; max?: number } | undefined) ?? {};
+  const bp = (b.get('agePreference') as { min?: number; max?: number } | undefined) ?? {};
+  const aMin = ap.min ?? 18;
+  const aMax = ap.max ?? 99;
+  const bMin = bp.min ?? 18;
+  const bMax = bp.max ?? 99;
+  return b.age >= aMin && b.age <= aMax && a.age >= bMin && a.age <= bMax;
+}
+
+/**
+ * Pure reciprocity policy. Walk a requester's ranked shortlist and return the
+ * FIRST candidate for whom the requester is also a near-top option — the
+ * requester's score with them must be at least `factor` of that candidate's own
+ * best alternative. Falls back to the top-ranked item so a match is always
+ * produced when the shortlist is non-empty. Exported for unit tests.
+ */
+export function selectReciprocalMatch<T>(
+  ranked: { item: T; score: number }[],
+  bestAlternativeScore: (item: T) => number,
+  factor: number
+): T | null {
+  for (const entry of ranked) {
+    const theirBest = Math.max(entry.score, bestAlternativeScore(entry.item));
+    if (entry.score >= factor * theirBest) return entry.item;
+  }
+  return ranked.length > 0 ? ranked[0].item : null;
+}
+
 async function findBestCandidateWithScore(
   requester: UserDoc
 ): Promise<{ candidate: UserDoc; score: number } | null> {
@@ -96,23 +134,69 @@ async function findBestCandidateWithScore(
     excludedIds.push(m.candidateUserId as Types.ObjectId);
   }
 
-  const candidates = await UserModel.find({ _id: { $nin: excludedIds } });
+  // Load the select:false face fields so the ranker's Phase-2 taste blend has
+  // them without any per-candidate query.
+  const candidates = await UserModel.find({ _id: { $nin: excludedIds } }).select(
+    '+faceEmbedding +faceTasteVector +faceTasteMargin +faceTasteLikes +faceTasteDislikes'
+  );
 
-  // Keep only candidates who are a mutual gender/attraction match.
-  const eligible = candidates.filter((c) => genderCompatible(requester, c));
+  // Keep only candidates who are a mutual gender/attraction AND age-range match.
+  const eligible = candidates.filter(
+    (c) => genderCompatible(requester, c) && ageCompatible(requester, c)
+  );
   if (eligible.length === 0) return null;
 
-  let best: UserDoc | null = null;
-  let bestScore = -1;
-  for (const c of eligible) {
-    const s = await scoreCandidateWithLearning(requester, c);
-    if (s > bestScore) {
-      bestScore = s;
-      best = c;
+  // Score everything from features extracted ONCE per user (requester + the whole
+  // available pool) plus the learned weights. scoreFromFeatures is pure, so the
+  // reciprocity check below — which needs each candidate's OWN best alternative —
+  // adds no extra DB work. (At scale these features would be cached/batched.)
+  const [requesterFeatures, weights, globalTaste] = await Promise.all([
+    extractUserFeatures(requester),
+    learnWeightsFromOutcomes(),
+    getGlobalUsableTasteUsers(),
+  ]);
+  const featById = new Map<string, UserFeatureVector>();
+  await Promise.all(
+    candidates.map(async (c) => {
+      featById.set(String(c._id), await extractUserFeatures(c));
+    })
+  );
+  const scoreOf = (a: UserFeatureVector, b: UserFeatureVector) =>
+    scoreFromFeatures(a, b, weights, globalTaste);
+
+  // The requester's own shortlist, best match first.
+  const ranked = eligible
+    .map((c) => {
+      const feat = featById.get(String(c._id))!;
+      return { candidate: c, feat, score: scoreOf(requesterFeatures, feat) };
+    })
+    .sort((a, b) => b.score - a.score);
+
+  // Reciprocity gate (pure policy in selectReciprocalMatch): prefer the
+  // highest-ranked candidate for whom the requester is ALSO a near-top option —
+  // that candidate wouldn't clearly rather be matched with someone else in the
+  // pool. Their alternatives are approximated by the same available pool, so this
+  // is a preference heuristic, not exact stable matching.
+  type Ranked = (typeof ranked)[number];
+  const bestAlternativeScore = (entry: Ranked): number => {
+    let best = 0;
+    for (const other of candidates) {
+      if (String(other._id) === String(entry.candidate._id)) continue;
+      if (!genderCompatible(entry.candidate, other) || !ageCompatible(entry.candidate, other)) {
+        continue;
+      }
+      const s = scoreOf(entry.feat, featById.get(String(other._id))!);
+      if (s > best) best = s;
     }
-  }
-  if (!best) return null;
-  return { candidate: best, score: bestScore };
+    return best;
+  };
+
+  const chosen = selectReciprocalMatch(
+    ranked.map((r) => ({ item: r, score: r.score })),
+    bestAlternativeScore,
+    RECIPROCITY_FACTOR
+  );
+  return chosen ? { candidate: chosen.candidate, score: chosen.score } : null;
 }
 
 export async function findBestCandidate(requester: UserDoc): Promise<UserDoc | null> {
@@ -135,7 +219,11 @@ export async function generateMatchForUser(
   userId: string,
   phase: Phase
 ): Promise<GeneratedMatch | null> {
-  const requester = await UserModel.findById(userId);
+  // +select the face fields so the requester side of the Phase-2 taste blend
+  // (candidate's taste vs requester's face) is available at score time.
+  const requester = await UserModel.findById(userId).select(
+    '+faceEmbedding +faceTasteVector +faceTasteMargin +faceTasteLikes +faceTasteDislikes'
+  );
   if (!requester) {
     throw new Error('User not found');
   }
@@ -154,17 +242,26 @@ export async function generateMatchForUser(
     // Candidate vanished (deleted) — fall through and make a new match.
   }
 
-  const inLearning = learningDay(requester) < LEARNING_DAYS;
-  if (phase === 'phase_1' && !inLearning) {
-    await UserModel.updateOne({ _id: requester._id }, { currentPhase: 'phase_2' });
+  // A user who actively SKIPPED is in a cooldown — no new match until it lifts.
+  // (Being skipped by someone else sets no cooldown, so that person gets a match
+  // right away.) Applies in both phases.
+  const cooldownUntil = requester.get('cooldownUntil') as Date | null | undefined;
+  if (cooldownUntil && cooldownUntil.getTime() > Date.now()) {
     return null;
   }
 
+  const inLearning = learningDay(requester) < LEARNING_DAYS;
+  if (phase === 'phase_1' && !inLearning) {
+    // Learning period is over → promote to phase 2 and FALL THROUGH to try a
+    // curated match (rather than returning null). Returning null here used to
+    // strand any client still calling the daily endpoint with a stale local
+    // phase: it never learned to switch to the phase-2 flow, so it re-requested
+    // phase 1 forever and saw "no match" permanently.
+    await UserModel.updateOne({ _id: requester._id }, { currentPhase: 'phase_2' });
+    phase = 'phase_2';
+  }
+
   if (phase === 'phase_2') {
-    const cooldownUntil = requester.get('cooldownUntil') as Date | null | undefined;
-    if (cooldownUntil && cooldownUntil.getTime() > Date.now()) {
-      return null;
-    }
     if (inLearning) {
       return null;
     }
@@ -240,6 +337,7 @@ export function toClientMatch(
   return {
     matchId: String(match._id),
     status: match.status,
+    phase: match.phase, // so the client can sync its local phase to reality
     conversationId: match.conversationId ?? undefined,
     candidateName: candidate.name,
     candidateAge: candidate.age,

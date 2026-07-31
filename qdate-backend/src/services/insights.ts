@@ -2,6 +2,7 @@ import { Types } from 'mongoose';
 import { UserModel } from '../models/User';
 import { MatchModel } from '../models/Match';
 import { MessageModel } from '../models/Message';
+import { SwipeModel } from '../models/Swipe';
 import { getAvgResponseTimeSeconds, countMessagesForUserInLastDays } from './messages';
 import { getLikeRates } from './swipes';
 
@@ -15,6 +16,14 @@ export type InsightsSummary = {
     skipped: number;
     expired: number;
     pendingOrActive: number;
+  };
+  // A count of each thing the user has actually done in the app.
+  activity: {
+    interestSwipes: number;
+    lookSwipes: number;
+    matches: number;
+    connections: number;
+    messagesSent: number;
   };
   calibration: { interests: number | null; looks: number | null };
   reflections: { matchId: string; name: string; age: number; reason: string }[];
@@ -53,6 +62,23 @@ export async function computeInsights(userId: string): Promise<InsightsSummary> 
     }
   }
 
+  // Per-activity counts (each thing the user has done)
+  const [interestSwipes, lookSwipes] = await Promise.all([
+    SwipeModel.countDocuments({ userId: uid, mode: 'interests' }),
+    SwipeModel.countDocuments({ userId: uid, mode: 'looks' }),
+  ]);
+  const activity = {
+    interestSwipes,
+    lookSwipes,
+    matches:
+      matchOutcomes.connected +
+      matchOutcomes.skipped +
+      matchOutcomes.expired +
+      matchOutcomes.pendingOrActive,
+    connections: matchOutcomes.connected,
+    messagesSent: totalMessages,
+  };
+
   // Calibration like-rates per deck
   const calibration = await getLikeRates(userId);
 
@@ -85,6 +111,7 @@ export async function computeInsights(userId: string): Promise<InsightsSummary> 
     messagesSentLast7Days,
     totalMessages,
     matchOutcomes,
+    activity,
     calibration,
     reflections,
   };

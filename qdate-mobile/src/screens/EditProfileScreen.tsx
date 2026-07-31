@@ -3,7 +3,6 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Alert,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -15,6 +14,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../auth/AuthContext';
 import { PhotoPicker } from '../components/PhotoPicker';
 import { PrimaryButton } from '../components/PrimaryButton';
+import { AgeRangePicker } from '../components/AgeRangePicker';
+import { KeyboardAwareScrollView } from '../components/KeyboardAwareScrollView';
 import { INTEREST_OPTIONS, INTEREST_PICK_COUNT } from '../data/interests';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import { Attraction, CommStyle, DatingIntent, Gender } from '../types';
@@ -60,6 +61,7 @@ export function EditProfileScreen({ navigation }: Props) {
   const [attraction, setAttraction] = useState<Attraction | null>(
     user?.attraction ?? null
   );
+  const [ageRange, setAgeRange] = useState(user?.agePreference ?? { min: 18, max: 99 });
   const [intent, setIntent] = useState<DatingIntent>(
     user?.profile.intent ?? 'long_term'
   );
@@ -104,6 +106,7 @@ export function EditProfileScreen({ navigation }: Props) {
         bio: bio.trim(),
         gender,
         attraction,
+        agePreference: ageRange,
         interestTags: interests,
         profile: {
           intent,
@@ -128,11 +131,7 @@ export function EditProfileScreen({ navigation }: Props) {
         <View style={{ width: 48 }} />
       </View>
 
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
+      <KeyboardAwareScrollView contentContainerStyle={styles.scroll}>
         <Text style={styles.label}>Name</Text>
         <TextInput
           style={styles.input}
@@ -185,6 +184,9 @@ export function EditProfileScreen({ navigation }: Props) {
           onSelect={(v) => setAttraction(v)}
         />
 
+        <Text style={styles.label}>Preferred age range</Text>
+        <AgeRangePicker value={ageRange} onChange={setAgeRange} />
+
         <Text style={styles.label}>Looking for</Text>
         <Chips options={INTENT_OPTIONS} selected={intent} onSelect={(v) => setIntent(v)} />
 
@@ -227,7 +229,7 @@ export function EditProfileScreen({ navigation }: Props) {
             );
           })}
         </View>
-      </ScrollView>
+      </KeyboardAwareScrollView>
 
       <View style={[styles.footer, { paddingBottom: spacing.lg + insets.bottom }]}>
         <PrimaryButton

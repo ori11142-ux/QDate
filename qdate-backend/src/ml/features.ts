@@ -31,6 +31,13 @@ export type UserFeatureVector = {
   feedbackCommunicationAvg: number | null;
   interestTags: string[];
   appearanceTags: string[];
+  // Phase 2 face-taste features, read off the (already-loaded) User doc. Empty
+  // arrays / zeros when unavailable, which the ranker treats as tag-only.
+  faceEmbedding: number[];
+  faceTasteVector: number[];
+  faceTasteMargin: number;
+  faceTasteLikes: number;
+  faceTasteDislikes: number;
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -39,7 +46,7 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-function confidenceFromResponseMs(responseTimeMs: number | null | undefined): number {
+export function confidenceFromResponseMs(responseTimeMs: number | null | undefined): number {
   if (responseTimeMs == null) return 1;
   if (responseTimeMs <= 1500) return 1.2;
   if (responseTimeMs <= 5000) return 1;
@@ -264,6 +271,13 @@ export async function extractUserFeatures(user: UserDoc): Promise<UserFeatureVec
     feedbackCommunicationAvg: feedback?.communicationAvg ?? null,
     interestTags: (user.get('interestTags') as string[] | undefined) ?? [],
     appearanceTags: (user.get('appearanceTags') as string[] | undefined) ?? [],
+    // select:false fields — present only when the caller loaded them with
+    // +select (matchmaker does). Absent → empty → ranker falls back to tag-only.
+    faceEmbedding: (user.get('faceEmbedding') as number[] | undefined) ?? [],
+    faceTasteVector: (user.get('faceTasteVector') as number[] | undefined) ?? [],
+    faceTasteMargin: (user.get('faceTasteMargin') as number | undefined) ?? 0,
+    faceTasteLikes: (user.get('faceTasteLikes') as number | undefined) ?? 0,
+    faceTasteDislikes: (user.get('faceTasteDislikes') as number | undefined) ?? 0,
   };
 }
 
