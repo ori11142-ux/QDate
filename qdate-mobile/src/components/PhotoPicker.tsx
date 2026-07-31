@@ -1,8 +1,15 @@
 import React from 'react';
 import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 
 import { colors, radius, spacing, typography } from '../theme';
+
+// Photos are uploaded as base64 in a single request (4 at a time) through a 6 MB
+// JSON limit, so full-res phone photos would fail. Downscale to this max edge and
+// JPEG-compress first — plenty for display and for the face model (which works at
+// 640px), while keeping each photo to a few hundred KB.
+const MAX_UPLOAD_DIM = 1000;
 
 interface Props {
   photos: string[];
@@ -29,16 +36,31 @@ export function PhotoPicker({ photos, onChange, max = 4 }: Props) {
     const result = await ImagePicker.launchImageLibraryAsync({
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.4,
-      base64: true,
+      quality: 1, // final compression is handled by the manipulator below
     });
     if (result.canceled || result.assets.length === 0) return;
 
     const asset = result.assets[0];
-    const uri = asset.base64
-      ? `data:image/jpeg;base64,${asset.base64}`
-      : asset.uri;
-    if (!uri) return;
+    if (!asset.uri) return;
+
+    // Downscale (only if larger — never upscale) + JPEG-compress before base64.
+    let uri = asset.uri;
+    try {
+      const context = ImageManipulator.manipulate(asset.uri);
+      if (asset.width && asset.width > MAX_UPLOAD_DIM) {
+        context.resize({ width: MAX_UPLOAD_DIM }); // height auto → preserves the square crop
+      }
+      const rendered = await context.renderAsync();
+      const out = await rendered.saveAsync({
+        format: SaveFormat.JPEG,
+        compress: 0.6,
+        base64: true,
+      });
+      if (out.base64) uri = `data:image/jpeg;base64,${out.base64}`;
+      else if (out.uri) uri = out.uri;
+    } catch {
+      // Fall back to the original asset if manipulation is unavailable.
+    }
 
     const next = [...photos];
     next[index] = uri;

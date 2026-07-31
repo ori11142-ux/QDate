@@ -6,6 +6,8 @@ import {
   findUserById,
   findUserByEmail,
   updateUserProfile,
+  adjustIntentScore,
+  sanitizeAgePreference,
   ProfileUpdate,
 } from '../services/users';
 import { INTEREST_OPTIONS, sanitizeInterestTags } from '../data/interests';
@@ -50,6 +52,7 @@ import {
   getModerationStanding,
   ModerationError,
 } from '../services/moderation';
+import { updateUserFaceEmbedding } from '../ml/faceEmbedding';
 
 export const router = Router();
 const RATE_WINDOW_MS = 60 * 1000;
@@ -107,9 +110,11 @@ router.post('/auth/register', async (req, res) => {
       interestTags,
       gender,
       attraction,
+      agePreference,
       profile,
       guidelinesAccepted,
       guidelinesVersion,
+      biometricConsent,
     } = req.body;
     if (!email || !name || !age || !password || !profile) {
       res
@@ -138,9 +143,17 @@ router.post('/auth/register', async (req, res) => {
       interestTags,
       gender,
       attraction,
+      agePreference,
       profile,
       guidelinesVersion: typeof guidelinesVersion === 'string' ? guidelinesVersion : GUIDELINES_VERSION,
+      biometricConsent: biometricConsent === true,
     });
+    // Compute the pretrained face embedding in the background — ONLY if the user
+    // consented to biometric processing. Without consent they're matched by
+    // interests and no face signature is created.
+    if (biometricConsent === true) {
+      void updateUserFaceEmbedding(String(user._id), user.get('photos') as string[]);
+    }
     res.status(201).json(user.toJSON());
   } catch (e: any) {
     if (e instanceof AuthError && e.code === 'EMAIL_EXISTS') {
@@ -234,6 +247,9 @@ router.patch('/users/:id', async (req, res) => {
     if (body.attraction === null || ATTRACTIONS.includes(body.attraction)) {
       updates.attraction = body.attraction ?? null;
     }
+    if (body.agePreference && typeof body.agePreference === 'object') {
+      updates.agePreference = sanitizeAgePreference(body.agePreference);
+    }
     if (typeof body.photoUrl === 'string' || body.photoUrl === null) {
       updates.photoUrl = body.photoUrl ?? null;
     }
@@ -272,6 +288,11 @@ router.patch('/users/:id', async (req, res) => {
     if (!user) {
       res.status(404).json({ error: 'Not found' });
       return;
+    }
+    // Photos changed → recompute the face embedding in the background, but only
+    // if the user consented to biometric processing.
+    if (updates.photos && user.get('biometricConsentAt')) {
+      void updateUserFaceEmbedding(String(user._id), updates.photos as string[]);
     }
     res.json(user.toJSON());
   } catch (e: any) {
@@ -377,16 +398,21 @@ router.post('/match/daily_generate', softRateLimit('daily_generate', 30), async 
       return;
     }
     const result = await generateMatchForUser(String(parsedUserId), 'phase_1');
+    const requester = await UserModel.findById(parsedUserId).select('cooldownUntil');
+    const cooldownUntil = requester?.get('cooldownUntil') as Date | null | undefined;
+    const cooldownIso =
+      cooldownUntil && cooldownUntil.getTime() > Date.now() ? cooldownUntil.toISOString() : null;
     if (!result) {
-      res.status(404).json({ error: 'No candidates available right now' });
+      // No match right now. Tell the client whether it's a phase-2 cooldown (so
+      // it can show the countdown, which then survives reloads) or genuinely no
+      // candidates. 200, not 404 — "no match yet" is a normal state, not an error.
+      res.json({ match: null, cooldownUntil: cooldownIso });
       return;
     }
-    const requester = await UserModel.findById(parsedUserId).select('cooldownUntil');
-    res.json(
-      toClientMatch(result.match, result.candidate, {
-        cooldownUntil: requester?.get('cooldownUntil') as Date | null | undefined,
-      })
-    );
+    res.json({
+      match: toClientMatch(result.match, result.candidate, { cooldownUntil }),
+      cooldownUntil: cooldownIso,
+    });
   } catch (e: any) {
     res.status(400).json({ error: e?.message ?? 'Failed to generate match' });
   }
@@ -432,27 +458,42 @@ router.post('/match/:matchId/skip', async (req, res) => {
     res.status(404).json({ error: 'Match not found' });
     return;
   }
+  const wasOpen = ['pending_reveal', 'active', 'connected'].includes(match.status as string);
   // End both sides of the mutual pairing.
   if (match.conversationId) {
     await skipPairing(match.conversationId);
   } else {
     await markSkipped(match._id);
   }
-  if (match.phase === 'phase_2' && match.isIntentionalPairing) {
-    const cooldownUntil = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+  // Only a genuine skip of an OPEN match applies the cooldown + intent nudge (a
+  // duplicate skip of an already-closed match is a no-op). The person who
+  // ACTIVELY skips (this match's owner) gets a cooldown before their next match
+  // — phase 1: 1 day, phase 2: 7 days. Only the skipper's id is touched, so the
+  // person who was SKIPPED keeps no cooldown and gets a new match right away.
+  if (wasOpen) {
+    // Phase 2: 7-day cooldown. Phase 1: 1 day (the daily-match rhythm).
+    const cooldownMs = match.phase === 'phase_2' ? 7 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+    const cooldownUntil = new Date(Date.now() + cooldownMs);
     await UserModel.updateOne({ _id: match.userId }, { cooldownUntil });
+    await adjustIntentScore(match.userId, -0.25); // skipping = small negative intent signal
   }
   res.json({ ok: true });
 });
 
 router.post('/match/:matchId/connect', async (req, res) => {
+  const before = await findMatchById(req.params.matchId);
   const match = await markConnected(req.params.matchId);
   if (!match) {
     res.status(404).json({ error: 'Match not found' });
     return;
   }
-  if (match.phase === 'phase_2') {
-    await UserModel.updateOne({ _id: match.userId }, { cooldownUntil: null });
+  // Engaging (opening the chat) clears any skip cooldown.
+  await UserModel.updateOne({ _id: match.userId }, { cooldownUntil: null });
+  // Positive intent signal — but only the FIRST time this match is connected;
+  // the chat screen re-calls connect on every open, which shouldn't keep
+  // inflating the score.
+  if (before && before.status !== 'connected') {
+    await adjustIntentScore(match.userId, 0.5);
   }
   res.json(match.toJSON());
 });

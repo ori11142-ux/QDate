@@ -1,5 +1,6 @@
 import { Types } from 'mongoose';
 import { SwipeDoc, SwipeModel } from '../models/Swipe';
+import { updateFaceTaste } from '../ml/faceTaste';
 
 export type RecordSwipeInput = {
   userId: string | Types.ObjectId;
@@ -10,7 +11,13 @@ export type RecordSwipeInput = {
 };
 
 export async function recordSwipe(input: RecordSwipeInput): Promise<SwipeDoc> {
-  return SwipeModel.create({ ...input, swipedAt: new Date() });
+  const swipe = await SwipeModel.create({ ...input, swipedAt: new Date() });
+  // A looks-swipe changes this user's visual taste — recompute in the background,
+  // mirroring the face-embedding trigger. Never blocks POST /swipes.
+  if (input.mode === 'looks') {
+    void updateFaceTaste(String(input.userId));
+  }
+  return swipe;
 }
 
 export async function listSwipesForUser(

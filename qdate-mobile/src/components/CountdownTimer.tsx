@@ -11,10 +11,14 @@ interface Props {
 function formatRemaining(ms: number): string {
   if (ms <= 0) return '00:00:00';
   const total = Math.floor(ms / 1000);
-  const h = Math.floor(total / 3600);
+  const d = Math.floor(total / 86400);
+  const h = Math.floor((total % 86400) / 3600);
   const m = Math.floor((total % 3600) / 60);
   const s = total % 60;
   const pad = (n: number) => n.toString().padStart(2, '0');
+  // For multi-day windows (e.g. the 7-day Phase-2 cooldown / match expiry) show
+  // days + h:m; under a day fall back to the familiar h:m:s.
+  if (d > 0) return `${d}d ${pad(h)}:${pad(m)}`;
   return `${pad(h)}:${pad(m)}:${pad(s)}`;
 }
 

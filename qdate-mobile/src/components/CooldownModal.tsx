@@ -20,11 +20,10 @@ export function CooldownModal({ visible, onCancel, onConfirm }: Props) {
 
           <Text style={styles.title}>Skip your curated match?</Text>
           <Text style={styles.body}>
-            Skipping replaces this week&apos;s pairing with a{' '}
-            <Text style={styles.bodyBold}>regular daily match tomorrow</Text> — not next
-            week&apos;s curated one.
+            This is a curated, high-intentionality pairing. If you skip it, your{' '}
+            <Text style={styles.bodyBold}>next curated match won&apos;t arrive for 7 days</Text>.
           </Text>
-          <Text style={styles.body}>You&apos;ll wait another full week for a curated pairing.</Text>
+          <Text style={styles.body}>Take your time before deciding.</Text>
 
           <View style={styles.actions}>
             <Pressable

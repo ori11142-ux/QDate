@@ -84,18 +84,16 @@ const PHASE_CONFIG: Record<
     revealLabel: 'Reveal This Week\'s Match',
     revealSubtitle: 'A high-intentionality pairing. Take your time.',
     confirmSkip: true,
-    closedTitle: 'Back to a daily match',
+    closedTitle: 'Next curated match in 7 days',
     closedBody:
-      'You skipped this week\'s curated match. A regular daily match arrives tomorrow — and the next curated one comes in a week.',
+      'You skipped this week\'s curated match. Your next high-intentionality pairing arrives in 7 days.',
     closedSymbol: '⏳',
   },
 };
 
 export function DailyFocusScreen({ navigation }: Props) {
-  const { user } = useAuth();
-  const phase: Phase = user?.currentPhase ?? 'phase_1';
+  const { user, syncPhase } = useAuth();
   const userId = user?.id ?? '';
-  const cfg = PHASE_CONFIG[phase];
 
   const [stage, setStage] = useState<Stage>('loading');
   const [match, setMatch] = useState<Match | null>(null);
@@ -103,6 +101,11 @@ export function DailyFocusScreen({ navigation }: Props) {
   const [actionInFlight, setActionInFlight] = useState(false);
   const [cooldownModalOpen, setCooldownModalOpen] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  // The phase to DISPLAY comes from the match the server actually returned — the
+  // server promotes aged users to phase 2 — falling back to the stored phase.
+  const phase: Phase = match?.phase ?? user?.currentPhase ?? 'phase_1';
+  const cfg = PHASE_CONFIG[phase];
 
   const profileOpacity = useRef(new Animated.Value(0)).current;
   const profileTranslate = useRef(new Animated.Value(20)).current;
@@ -117,24 +120,37 @@ export function DailyFocusScreen({ navigation }: Props) {
     setNextMatchAt(null);
     setLoadError(null);
 
-    const fetcher =
-      phase === 'phase_2'
-        ? api.getWeeklyCuratedMatch(userId)
-        : api.generateDailyMatch(userId);
-
-    return fetcher
-      .then((m) => {
-        setMatch(m);
-        if (m.status === 'connected' || m.status === 'active') {
-          // Already revealed (or chat already opened) — show the profile
-          // directly instead of replaying the mystery reveal.
-          setStage('revealed');
-          profileOpacity.setValue(1);
-          profileTranslate.setValue(0);
+    // Always the daily endpoint — the server promotes the user to phase 2 once
+    // their learning period ends and returns the phase on the match, so the
+    // client no longer needs its (possibly stale) local phase to pick an
+    // endpoint. This is what fixes users getting stranded after 14 days.
+    return api
+      .generateDailyMatch(userId)
+      .then((res) => {
+        if (res.match) {
+          const m = res.match;
+          setMatch(m);
+          if (m.status === 'connected' || m.status === 'active') {
+            // Already revealed (or chat already opened) — show the profile
+            // directly instead of replaying the mystery reveal.
+            setStage('revealed');
+            profileOpacity.setValue(1);
+            profileTranslate.setValue(0);
+          } else {
+            setStage('mystery');
+            profileOpacity.setValue(0);
+            profileTranslate.setValue(20);
+          }
+        } else if (res.cooldownUntil) {
+          // In a skip cooldown (phase 1: 1 day, phase 2: 7 days) → show the
+          // countdown to the next match. Reconstructed from the server, so it
+          // survives reloads.
+          setNextMatchAt(res.cooldownUntil);
+          setStage('closed');
         } else {
-          setStage('mystery');
-          profileOpacity.setValue(0);
-          profileTranslate.setValue(20);
+          // Genuinely no candidate available right now.
+          setLoadError('No new match right now — check back soon.');
+          setStage('unavailable');
         }
       })
       .catch((e) => {
@@ -142,11 +158,20 @@ export function DailyFocusScreen({ navigation }: Props) {
         setLoadError(String(e?.message ?? e));
         setStage('unavailable');
       });
-  }, [phase, userId, profileOpacity, profileTranslate]);
+  }, [userId, profileOpacity, profileTranslate]);
 
   useEffect(() => {
     loadMatch();
   }, [loadMatch]);
+
+  // Keep the stored phase in sync with what the server reports on the match, so
+  // the phase badges elsewhere (Home, Insights, Profile) reflect reality.
+  useEffect(() => {
+    if (match?.phase && user && match.phase !== user.currentPhase) {
+      void syncPhase(match.phase);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [match?.phase, user?.currentPhase]);
 
   // Which of the candidate's photos is shown large. Reset whenever the match changes.
   const [activePhoto, setActivePhoto] = useState(0);
@@ -218,17 +243,20 @@ export function DailyFocusScreen({ navigation }: Props) {
 
   async function commitSkip() {
     if (!match) return;
+    // Cooldown length by phase — phase 1: 1 day, phase 2: 7 days.
+    // Keep in sync with the backend skip route.
+    const cooldownMs = phase === 'phase_2' ? 7 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
     skippingRef.current = true;
     setCooldownModalOpen(false);
     setActionInFlight(true);
     try {
-      // Close this match on the backend (status → skipped) so the next
-      // generate picks a new candidate.
+      // Close this match on the backend (status → skipped). This sets YOUR skip
+      // cooldown; the person you skipped gets no cooldown and a fresh match.
       await api.skipMatch(match.matchId);
-      // Both phases: next match arrives in 24h after a skip.
-      // (Phase 2 specifically: skipping = back to daily for the next cycle.)
-      const next = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-      setNextMatchAt(next);
+      // Show the countdown DIRECTLY — don't depend on a follow-up fetch to report
+      // the cooldown (which is what caused "no match right now" after a skip). The
+      // server-reported cooldown still drives the countdown on a later reload.
+      setNextMatchAt(new Date(Date.now() + cooldownMs).toISOString());
       setStage('closed');
     } catch (e) {
       Alert.alert('Could not skip', String(e));

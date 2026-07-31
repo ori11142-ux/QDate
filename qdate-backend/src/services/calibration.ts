@@ -24,6 +24,11 @@ export type LookProfileCard = {
   tags: string[];
 };
 
+// Face-descriptor length from the pretrained recognition net (see ml/faceEmbedding).
+// A profile whose faceEmbedding has this many elements had a face successfully
+// recognized in their photo; an empty array (or missing) means no face was found.
+const FACE_EMBEDDING_DIM = 128;
+
 /** Does someone with this `attraction` want to be shown this `gender`? */
 function attractedTo(
   attraction: string | null | undefined,
@@ -39,8 +44,12 @@ function attractedTo(
 async function eligibleProfiles(userId: string | Types.ObjectId): Promise<UserDoc[]> {
   const me = await UserModel.findById(userId);
   if (!me) return [];
+  const pref = (me.get('agePreference') as { min?: number; max?: number } | undefined) ?? {};
+  const min = pref.min ?? 18;
+  const max = pref.max ?? 99;
   const others = await UserModel.find({ _id: { $ne: me._id } });
-  return others.filter((c) => attractedTo(me.attraction, c.gender));
+  // Calibrate only on people you'd date — right gender and inside your age range.
+  return others.filter((c) => attractedTo(me.attraction, c.gender) && c.age >= min && c.age <= max);
 }
 
 /** Cards the user hasn't swiped on yet come first; already-seen ones trail. */
@@ -77,7 +86,17 @@ export async function getLookCalibrationDeck(
     SwipeModel.distinct('cardId', { userId, mode: 'looks' }),
   ]);
 
+  // Looks calibration is about FACES — only show people whose photo actually had
+  // a recognizable face (a full-length face embedding). Placeholder / no-face
+  // photos are excluded. (faceEmbedding is select:false but still queryable.)
+  const withFace = await UserModel.find({
+    _id: { $in: profiles.map((p) => p._id) },
+    faceEmbedding: { $size: FACE_EMBEDDING_DIM },
+  }).select('_id');
+  const faceIds = new Set(withFace.map((u) => String(u._id)));
+
   const cards: LookProfileCard[] = profiles
+    .filter((p) => faceIds.has(String(p._id)))
     .map((p) => {
       const photos = (p.get('photos') as string[] | undefined) ?? [];
       const primary = photos[0] ?? (p.get('photoUrl') as string | null | undefined) ?? null;

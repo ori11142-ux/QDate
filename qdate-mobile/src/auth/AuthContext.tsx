@@ -8,15 +8,17 @@ export type RegisterInput = {
   name: string;
   email: string;
   age: number;
-  authMethod: 'email' | 'apple';
+  authMethod: 'email' | 'apple' | 'google';
   password: string;
   photos: string[];
   bio?: string;
   interestTags?: string[];
   gender?: 'man' | 'woman' | null;
   attraction?: 'men' | 'women' | 'both' | null;
+  agePreference: { min: number; max: number };
   guidelinesAccepted: boolean;
   guidelinesVersion: string;
+  biometricConsent: boolean;
   profile: {
     intent: 'long_term' | 'casual' | 'explore' | 'friendship';
     sharedIntellectImportance: number;
@@ -31,7 +33,7 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<void>;
   updateProfile: (updates: ProfileUpdatePayload) => Promise<void>;
   signOut: () => Promise<void>;
-  togglePhase: () => Promise<void>;
+  syncPhase: (phase: Phase) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -48,6 +50,7 @@ function backendUserToStored(u: BackendUser): StoredUser {
     bio: u.bio ?? '',
     gender: u.gender ?? null,
     attraction: u.attraction ?? null,
+    agePreference: u.agePreference ?? { min: 18, max: 99 },
     profile: u.profile,
     interestTags: u.interestTags ?? [],
     currentPhase: u.currentPhase,
@@ -102,19 +105,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   }
 
-  // Demo-only: flips phase locally so you can show Phase 2 without waiting 14 days.
-  // Does not touch the backend.
-  async function togglePhase() {
-    if (!user) return;
-    const nextPhase: Phase = user.currentPhase === 'phase_1' ? 'phase_2' : 'phase_1';
-    const updated: StoredUser = { ...user, currentPhase: nextPhase };
+  // Sync local phase to the backend's truth — the server promotes a user to
+  // phase 2 once their learning period ends and reports the phase on each match,
+  // so the UI (and any phase-based logic) stays correct. No-op if unchanged.
+  async function syncPhase(phase: Phase) {
+    if (!user || user.currentPhase === phase) return;
+    const updated: StoredUser = { ...user, currentPhase: phase };
     await saveUser(updated);
     setUser(updated);
   }
 
   return (
     <AuthContext.Provider
-      value={{ user, isHydrating, register, login, updateProfile, signOut, togglePhase }}
+      value={{ user, isHydrating, register, login, updateProfile, signOut, syncPhase }}
     >
       {children}
     </AuthContext.Provider>

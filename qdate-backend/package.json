@@ -9,15 +9,27 @@
     "build": "tsc",
     "seed": "tsx src/scripts/seed.ts",
     "clear": "tsx src/scripts/clear.ts",
-    "verify": "tsx src/scripts/verify.ts"
+    "verify": "tsx src/scripts/verify.ts",
+    "embeddings": "tsx src/scripts/computeFaceEmbeddings.ts",
+    "seed:faces": "tsx src/scripts/seedRealFaces.ts",
+    "seed:phase2": "tsx src/scripts/seedPhase2.ts",
+    "face-taste": "tsx src/scripts/computeFaceTaste.ts",
+    "eval:face-taste": "tsx src/scripts/evalFaceTaste.ts",
+    "sim:swipes": "tsx src/scripts/simulateSwipes.ts",
+    "demo:matching": "tsx src/scripts/demoMatching.ts",
+    "dev:phase": "tsx src/scripts/devPhase.ts"
   },
   "dependencies": {
+    "@tensorflow/tfjs": "^4.22.0",
+    "@tensorflow/tfjs-backend-wasm": "^4.22.0",
     "@types/bcryptjs": "^2.4.6",
+    "@vladmandic/face-api": "^1.7.15",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.1",
-    "mongoose": "^8.8.0"
+    "mongoose": "^8.8.0",
+    "sharp": "^0.35.3"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",

@@ -6,6 +6,7 @@ import {
   FlatList,
   Image,
   Keyboard,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -26,6 +27,10 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Chat'>;
 
 const MESSAGE_POLL_MS = 3000;
 const STATUS_POLL_MS = 2500;
+// Android's keyboard event reports the KEYS height but often excludes the
+// suggestion/toolbar strip on top; add clearance so the composer clears it.
+// iOS reports the full height, so it needs none.
+const ANDROID_KB_EXTRA = 48;
 
 export function ChatScreen({ navigation, route }: Props) {
   const { matchId, conversationId, candidateName, candidatePhotoUrl } = route.params;
@@ -44,14 +49,18 @@ export function ChatScreen({ navigation, route }: Props) {
 
   const listRef = useRef<FlatList<ChatMessage>>(null);
 
-  // Manually lift the composer above the keyboard. KeyboardAvoidingView is
-  // unreliable under Android edge-to-edge (it left a dead gap when idle), so we
-  // reserve exactly the keyboard's height at the bottom of the body instead.
+  // Track the keyboard height and lift the composer above it on BOTH platforms.
+  // Android uses softwareKeyboardLayoutMode:"resize", which under edge-to-edge
+  // behaves like adjustNothing — the window is NOT panned (so no black gap and no
+  // header slide) and NOT auto-shrunk, so this JS lift is what raises the composer.
+  // iOS reports "will" before the animation (smooth); Android only fires "did".
   useEffect(() => {
-    const show = Keyboard.addListener('keyboardDidShow', (e) =>
+    const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const show = Keyboard.addListener(showEvt, (e) =>
       setKeyboardHeight(e.endCoordinates?.height ?? 0)
     );
-    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardHeight(0));
+    const hide = Keyboard.addListener(hideEvt, () => setKeyboardHeight(0));
     return () => {
       show.remove();
       hide.remove();
@@ -210,7 +219,7 @@ export function ChatScreen({ navigation, route }: Props) {
         </Pressable>
       </View>
 
-      <View style={[styles.body, { paddingBottom: keyboardHeight }]}>
+      <View style={[styles.body, keyboardHeight > 0 && { paddingBottom: keyboardHeight }]}>
         {checking ? (
           <View style={styles.center}>
             <ActivityIndicator color={colors.primary} />
@@ -232,6 +241,7 @@ export function ChatScreen({ navigation, route }: Props) {
             ref={listRef}
             data={messages}
             keyExtractor={(m) => m.id}
+            style={styles.list}
             contentContainerStyle={styles.messagesContent}
             renderItem={({ item }) => <Bubble message={item} />}
             ListEmptyComponent={
@@ -248,7 +258,19 @@ export function ChatScreen({ navigation, route }: Props) {
           <View
             style={[
               styles.composer,
-              { paddingBottom: spacing.sm + (keyboardHeight > 0 ? 0 : insets.bottom) },
+              // Keyboard up → add Android clearance for the suggestion strip the
+              // keyboard event under-reports (iOS reports full height, needs none).
+              // Keyboard down → clear the nav bar, floored (insets.bottom is often
+              // 0 under Expo Go edge-to-edge, else the composer hides behind it).
+              {
+                paddingBottom:
+                  spacing.sm +
+                  (keyboardHeight > 0
+                    ? Platform.OS === 'android'
+                      ? ANDROID_KB_EXTRA
+                      : 0
+                    : Math.max(insets.bottom, spacing.lg)),
+              },
             ]}
           >
             <TextInput
@@ -261,6 +283,7 @@ export function ChatScreen({ navigation, route }: Props) {
               maxLength={500}
               returnKeyType="send"
               onSubmitEditing={handleSend}
+              onFocus={() => setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 150)}
               blurOnSubmit={false}
             />
             <Pressable
@@ -339,6 +362,10 @@ const styles = StyleSheet.create({
   reportIcon: { fontSize: 20, color: colors.textMuted },
 
   body: { flex: 1 },
+  // flex:1 so the message list fills the space and the composer stays pinned to
+  // the bottom — otherwise a full list pushes the composer off-screen behind the
+  // keyboard, where the paddingBottom lift can't reach it.
+  list: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
 
   waitCard: { alignItems: 'center', gap: spacing.sm },
@@ -351,7 +378,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
 
-  messagesContent: { padding: spacing.md, gap: spacing.sm, flexGrow: 1 },
+  // flex-end so a short conversation sticks to the bottom, right above the
+  // composer — otherwise `pan` shoves top-anchored messages off-screen when the
+  // keyboard opens.
+  messagesContent: { padding: spacing.md, gap: spacing.sm, flexGrow: 1, justifyContent: 'flex-end' },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
   emptyText: { ...typography.body, color: colors.textMuted, textAlign: 'center' },
 

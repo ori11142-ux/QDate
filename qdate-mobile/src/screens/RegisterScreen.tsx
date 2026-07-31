@@ -1,10 +1,7 @@
 import React, { useState } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -13,6 +10,7 @@ import {
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { KeyboardAwareScrollView } from '../components/KeyboardAwareScrollView';
 import { PhotoPicker } from '../components/PhotoPicker';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { ProgressBar } from '../components/ProgressBar';
@@ -68,86 +66,77 @@ export function RegisterScreen({ navigation, route }: Props) {
         <View style={styles.backSpacer} />
       </View>
 
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <ScrollView
-          contentContainerStyle={styles.scroll}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <Text style={styles.h1}>Create your account</Text>
-          <Text style={styles.subtitle}>
-            We&apos;ll use this to introduce you to your matches.
-          </Text>
+      <KeyboardAwareScrollView contentContainerStyle={styles.scroll}>
+        <Text style={styles.h1}>Create your account</Text>
+        <Text style={styles.subtitle}>
+          We&apos;ll use this to introduce you to your matches.
+        </Text>
 
-          {/* Photo picker — exactly 4 required */}
-          <View style={styles.photoSection}>
-            <Text style={styles.label}>Your photos</Text>
-            <Text style={styles.hint}>Add 4 photos ({photos.length}/4)</Text>
-            <PhotoPicker photos={photos} onChange={setPhotos} max={4} />
-          </View>
-
-          <View style={styles.form}>
-            <View style={styles.field}>
-              <Text style={styles.label}>Short bio</Text>
-              <TextInput
-                value={bio}
-                onChangeText={(v) => setBio(v.slice(0, BIO_MAX))}
-                placeholder="One line about you"
-                placeholderTextColor={colors.textMuted}
-                style={[styles.input, styles.bioInput]}
-                multiline
-                maxLength={BIO_MAX}
-              />
-              <Text style={styles.hint}>
-                {bio.length}/{BIO_MAX}
-              </Text>
-            </View>
-            <Field
-              label="Your name"
-              value={name}
-              onChangeText={setName}
-              placeholder="Ori"
-              autoCapitalize="words"
-            />
-            <Field
-              label="Email"
-              value={email}
-              onChangeText={setEmail}
-              placeholder="you@example.com"
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-            <Field
-              label="Password"
-              value={password}
-              onChangeText={setPassword}
-              placeholder="At least 8 characters"
-              secureTextEntry
-              autoCapitalize="none"
-              hint="Minimum 8 characters"
-            />
-            <Field
-              label="Your age"
-              value={age}
-              onChangeText={(v) => setAge(v.replace(/\D/g, ''))}
-              placeholder="28"
-              keyboardType="number-pad"
-              maxLength={2}
-              hint="Must be 18 or older"
-            />
-          </View>
-        </ScrollView>
-
-        <View style={[styles.footer, { paddingBottom: spacing.lg + insets.bottom }]}>
-          <View style={styles.progressRow}>
-            <ProgressBar progress={0.5} />
-          </View>
-          <PrimaryButton title="Continue" onPress={handleContinue} disabled={!isValid} />
+        {/* Photo picker — exactly 4 required */}
+        <View style={styles.photoSection}>
+          <Text style={styles.label}>Your photos</Text>
+          <Text style={styles.hint}>Add 4 photos ({photos.length}/4)</Text>
+          <PhotoPicker photos={photos} onChange={setPhotos} max={4} />
         </View>
-      </KeyboardAvoidingView>
+
+        <View style={styles.form}>
+          <View style={styles.field}>
+            <Text style={styles.label}>Short bio</Text>
+            <TextInput
+              value={bio}
+              onChangeText={(v) => setBio(v.slice(0, BIO_MAX))}
+              placeholder="One line about you"
+              placeholderTextColor={colors.textMuted}
+              style={[styles.input, styles.bioInput]}
+              multiline
+              maxLength={BIO_MAX}
+            />
+            <Text style={styles.hint}>
+              {bio.length}/{BIO_MAX}
+            </Text>
+          </View>
+          <Field
+            label="Your name"
+            value={name}
+            onChangeText={setName}
+            placeholder="Ori"
+            autoCapitalize="words"
+          />
+          <Field
+            label="Email"
+            value={email}
+            onChangeText={setEmail}
+            placeholder="you@example.com"
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
+          <Field
+            label="Password"
+            value={password}
+            onChangeText={setPassword}
+            placeholder="At least 8 characters"
+            secureTextEntry
+            autoCapitalize="none"
+            hint="Minimum 8 characters"
+          />
+          <Field
+            label="Your age"
+            value={age}
+            onChangeText={(v) => setAge(v.replace(/\D/g, ''))}
+            placeholder="28"
+            keyboardType="number-pad"
+            maxLength={2}
+            hint="Must be 18 or older"
+          />
+        </View>
+      </KeyboardAwareScrollView>
+
+      <View style={[styles.footer, { paddingBottom: spacing.lg + insets.bottom }]}>
+        <View style={styles.progressRow}>
+          <ProgressBar progress={0.5} />
+        </View>
+        <PrimaryButton title="Continue" onPress={handleContinue} disabled={!isValid} />
+      </View>
     </View>
   );
 }
@@ -196,7 +185,6 @@ function Field({
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
-  flex: { flex: 1 },
 
   topBar: {
     flexDirection: 'row',

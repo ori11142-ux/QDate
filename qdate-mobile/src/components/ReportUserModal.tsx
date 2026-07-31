@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
+  Keyboard,
   Modal,
   Pressable,
   ScrollView,
@@ -31,6 +32,7 @@ export function ReportUserModal({
 }: Props) {
   const [category, setCategory] = useState<string | null>(null);
   const [reason, setReason] = useState('');
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   // Reset the form each time the sheet opens.
   useEffect(() => {
@@ -40,11 +42,26 @@ export function ReportUserModal({
     }
   }, [visible]);
 
+  // Lift the bottom sheet above the keyboard. It's pinned to the bottom of the
+  // screen, so internal scrolling can't clear the keyboard — we pad the backdrop
+  // by the keyboard's height instead. (KeyboardAvoidingView is unreliable under
+  // Android edge-to-edge — same reason ChatScreen measures the height directly.)
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', (e) =>
+      setKeyboardHeight(e.endCoordinates?.height ?? 0)
+    );
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardHeight(0));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
   const who = reportedName ?? 'this person';
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.backdrop}>
+      <View style={[styles.backdrop, { paddingBottom: keyboardHeight }]}>
         <View style={styles.sheet}>
           <View style={styles.header}>
             <Text style={styles.title}>Report {who}</Text>

@@ -21,7 +21,7 @@ import { RegisterScreen } from '../screens/RegisterScreen';
 import { WelcomeScreen } from '../screens/WelcomeScreen';
 import { colors, spacing, typography } from '../theme';
 
-export type AuthMethod = 'email' | 'apple';
+export type AuthMethod = 'email' | 'apple' | 'google';
 
 export type RootStackParamList = {
   Welcome: undefined;

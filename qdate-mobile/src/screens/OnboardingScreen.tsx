@@ -3,7 +3,6 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Alert,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -14,7 +13,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../auth/AuthContext';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { ProgressBar } from '../components/ProgressBar';
+import { KeyboardAwareScrollView } from '../components/KeyboardAwareScrollView';
 import { GuidelinesAgreement } from '../components/CommunityGuidelines';
+import { BiometricConsent } from '../components/BiometricConsent';
+import { AgeRangePicker } from '../components/AgeRangePicker';
 import { INTEREST_OPTIONS, INTEREST_PICK_COUNT } from '../data/interests';
 import { GUIDELINES_VERSION } from '../data/guidelines';
 import { RootStackParamList } from '../navigation/RootNavigator';
@@ -59,6 +61,8 @@ export function OnboardingScreen({ route }: Props) {
   const [attraction, setAttraction] = useState<Attraction | null>(null);
   const [interests, setInterests] = useState<string[]>([]);
   const [agreedGuidelines, setAgreedGuidelines] = useState(false);
+  const [biometricConsent, setBiometricConsent] = useState(false);
+  const [ageRange, setAgeRange] = useState({ min: 18, max: 99 });
   const [submitting, setSubmitting] = useState(false);
 
   function toggleInterest(tag: string) {
@@ -96,8 +100,10 @@ export function OnboardingScreen({ route }: Props) {
         interestTags: interests,
         gender,
         attraction,
+        agePreference: ageRange,
         guidelinesAccepted: agreedGuidelines,
         guidelinesVersion: GUIDELINES_VERSION,
+        biometricConsent,
         profile: {
           intent: intent!,
           sharedIntellectImportance: intellect,
@@ -119,10 +125,7 @@ export function OnboardingScreen({ route }: Props) {
         <Text style={styles.stepLabel}>Step 2 of 2</Text>
       </View>
 
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        showsVerticalScrollIndicator={false}
-      >
+      <KeyboardAwareScrollView contentContainerStyle={styles.scroll}>
         <Text style={styles.h1}>What are you looking for?</Text>
         <Text style={styles.subtitle}>
           Welcome, {name}. Help us learn your dating intent.
@@ -203,6 +206,10 @@ export function OnboardingScreen({ route }: Props) {
           ))}
         </View>
 
+        <Text style={styles.question}>Preferred age range</Text>
+        <Text style={styles.subtitle}>Only match me with people in this age range.</Text>
+        <AgeRangePicker value={ageRange} onChange={setAgeRange} />
+
         <Text style={styles.question}>Your interests</Text>
         <Text style={styles.subtitle}>
           Pick {INTEREST_PICK_COUNT} that describe you ({interests.length}/
@@ -230,7 +237,10 @@ export function OnboardingScreen({ route }: Props) {
           QDate is built on respect and safety. Please read and agree before you start.
         </Text>
         <GuidelinesAgreement agreed={agreedGuidelines} onAgreedChange={setAgreedGuidelines} />
-      </ScrollView>
+
+        <Text style={styles.question}>Face-based matching</Text>
+        <BiometricConsent consented={biometricConsent} onConsentedChange={setBiometricConsent} />
+      </KeyboardAwareScrollView>
 
       <View style={[styles.footer, { paddingBottom: spacing.lg + insets.bottom }]}>
         <View style={styles.progressRow}>

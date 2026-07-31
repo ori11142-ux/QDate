@@ -2,7 +2,7 @@ import { Schema, model, InferSchemaType, HydratedDocument } from 'mongoose';
 
 export const DATING_INTENTS = ['long_term', 'casual', 'explore', 'friendship'] as const;
 export const COMM_STYLES = ['texting_first', 'voice_early', 'meet_in_person'] as const;
-export const AUTH_METHODS = ['email', 'apple'] as const;
+export const AUTH_METHODS = ['email', 'apple', 'google'] as const;
 export const PHASES = ['phase_1', 'phase_2'] as const;
 export const GENDERS = ['man', 'woman'] as const;
 export const ATTRACTIONS = ['men', 'women', 'both'] as const;
@@ -25,6 +25,14 @@ const userSchema = new Schema(
     // The user's own gender, and who they're interested in.
     gender: { type: String, enum: GENDERS, default: null },
     attraction: { type: String, enum: ATTRACTIONS, default: null },
+
+    // Preferred age range for candidates. Enforced mutually by the matcher (like
+    // gender): each person must fall inside the other's range. Default [18, 99]
+    // = no restriction.
+    agePreference: {
+      min: { type: Number, default: 18, min: 18, max: 99 },
+      max: { type: Number, default: 99, min: 18, max: 99 },
+    },
 
     // Primary profile picture (mirrors photos[0]). Kept for the many avatar
     // call-sites that expect a single URL. External URL or data URI.
@@ -54,6 +62,13 @@ const userSchema = new Schema(
     guidelinesAcceptedVersion: { type: String, default: null },
     guidelinesAcceptedAt: { type: Date, default: null },
 
+    // Explicit, OPTIONAL consent to biometric (face) processing. Null when the
+    // user has not consented — in which case no faceEmbedding is computed and
+    // they are matched by interests only. Withdrawing consent should clear these
+    // and delete faceEmbedding/faceTasteVector.
+    biometricConsentVersion: { type: String, default: null },
+    biometricConsentAt: { type: Date, default: null },
+
     // Moderation standing, driven by reports (see services/moderation.ts).
     // strikeCount is a weighted, distinct-reporter score, not a raw count.
     moderationStatus: { type: String, enum: MODERATION_STATUSES, default: 'active', index: true },
@@ -63,6 +78,29 @@ const userSchema = new Schema(
     // Optional structured tags used by the matching model.
     interestTags: { type: [String], default: [] },
     appearanceTags: { type: [String], default: [] },
+
+    // Pretrained 128-d face embedding derived from the user's primary photo
+    // (see ml/faceEmbedding.ts). Biometric data — never sent to clients (see the
+    // toJSON transform below). Empty until computed; empty when no face is found.
+    faceEmbedding: { type: [Number], default: [], select: false },
+
+    // Phase 2 — learned visual taste (see ml/faceTaste.ts). A unit 128-d Rocchio
+    // direction = weightedMean(liked faces) − weightedMean(disliked faces),
+    // recomputed when the user records a 'looks' swipe. Derived from OTHER users'
+    // faces, so also biometric-adjacent → select:false + stripped from toJSON.
+    // Empty until there is both a liked and a disliked usable looks-swipe.
+    faceTasteVector: { type: [Number], default: [], select: false },
+    // ‖posCentroid − negCentroid‖ (0..2): taste separation/confidence. Drives the
+    // blend ramp and the global cold-start count ({ faceTasteMargin: { $gt: 0 } }).
+    // These are derived behavioral data (how much/how decisively a user swiped),
+    // so they're select:false — never returned by GET /users/:id, which has no
+    // auth. The scoring path loads them explicitly via +select in matchmaker.ts,
+    // and the cold-start count uses a server-side countDocuments (works either way).
+    faceTasteMargin: { type: Number, default: 0, select: false },
+    // Counts of usable liked/disliked looks-swipes behind the vector (min drives the trust ramp).
+    faceTasteLikes: { type: Number, default: 0, select: false },
+    faceTasteDislikes: { type: Number, default: 0, select: false },
+    faceTasteUpdatedAt: { type: Date, default: null, select: false },
   },
   { timestamps: true }
 );
@@ -74,6 +112,8 @@ userSchema.set('toJSON', {
     const r = ret as Record<string, unknown>;
     delete r._id;
     delete r.passwordHash;
+    delete r.faceEmbedding; // biometric — never expose over the API
+    delete r.faceTasteVector; // biometric-derived — never expose over the API
   },
 });
 

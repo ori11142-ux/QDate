@@ -47,6 +47,13 @@ export const mockInsights: InsightsSummary = {
     expired: 1,
     pendingOrActive: 1,
   },
+  activity: {
+    interestSwipes: 24,
+    lookSwipes: 18,
+    matches: 7,
+    connections: 2,
+    messagesSent: 48,
+  },
   calibration: { interests: 0.45, looks: 0.6 },
   reflections: [
     {

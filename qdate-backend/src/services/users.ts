@@ -5,7 +5,7 @@ export type CreateUserInput = {
   email: string;
   name: string;
   age: number;
-  authMethod: 'email' | 'apple';
+  authMethod: 'email' | 'apple' | 'google';
   gender?: 'man' | 'woman' | null;
   attraction?: 'men' | 'women' | 'both' | null;
   photoUrl?: string | null;
@@ -37,6 +37,7 @@ export type ProfileUpdate = Partial<
     | 'age'
     | 'gender'
     | 'attraction'
+    | 'agePreference'
     | 'photoUrl'
     | 'photos'
     | 'bio'
@@ -45,6 +46,19 @@ export type ProfileUpdate = Partial<
     | 'appearanceTags'
   >
 >;
+
+/** Clamp a preferred age range to valid values (18–99, min ≤ max). */
+export function sanitizeAgePreference(pref: unknown): { min: number; max: number } {
+  const p = (pref ?? {}) as { min?: unknown; max?: unknown };
+  const clamp = (v: unknown, def: number) => {
+    const n = typeof v === 'number' && Number.isFinite(v) ? Math.round(v) : def;
+    return Math.max(18, Math.min(99, n));
+  };
+  let min = clamp(p.min, 18);
+  let max = clamp(p.max, 99);
+  if (min > max) [min, max] = [max, min];
+  return { min, max };
+}
 
 export async function updateUserProfile(
   id: string | Types.ObjectId,
@@ -75,4 +89,24 @@ export async function setIntentScore(
 
 export async function touchLastActive(id: string | Types.ObjectId): Promise<void> {
   await UserModel.updateOne({ _id: id }, { lastActiveAt: new Date() });
+}
+
+/**
+ * Nudge a user's intent score by `delta`, clamped to [0, 10]. Used to reflect
+ * engagement actions (connecting to a match raises it; skipping lowers it).
+ * Atomic clamp via an aggregation-pipeline update so concurrent nudges are safe.
+ */
+export async function adjustIntentScore(
+  id: string | Types.ObjectId,
+  delta: number
+): Promise<void> {
+  await UserModel.updateOne({ _id: id }, [
+    {
+      $set: {
+        intentScore: {
+          $max: [0, { $min: [10, { $add: [{ $ifNull: ['$intentScore', 5] }, delta] }] }],
+        },
+      },
+    },
+  ]);
 }
