@@ -17,18 +17,40 @@ import {
 } from './mocks';
 
 // ─── Backend host resolution ──────────────────────────────────────────────
-// Your phone CANNOT reach "localhost" — that's the phone's own loopback, not
-// your computer. We auto-detect your computer's LAN IP from Expo's dev server
-// (it serves on that IP at port 8081; the backend is the same IP at port 5000).
+// PRODUCTION / standalone builds have no Expo dev server, so they read a
+// configured public URL: EXPO_PUBLIC_API_URL (set per-build in eas.json) or
+// expo.extra.apiUrl (app.json). This is REQUIRED for a real installed app.
 //
-// If auto-detection fails (some emulators, unusual networks), set MANUAL_HOST
-// to your computer's IP. Find it on Windows with `ipconfig` → IPv4 Address.
+// DEV (Expo Go): your phone CANNOT reach "localhost" — that's the phone's own
+// loopback. We auto-detect your computer's LAN IP from Expo's dev server (port
+// 8081; the backend is the same IP at port 5000). Set MANUAL_HOST to override
+// (find your IP on Windows with `ipconfig` → IPv4 Address).
 const MANUAL_HOST = ''; // e.g. 'http://192.168.1.42:5000'
 const BACKEND_PORT = 5000;
 
 function resolveBackendHost(): string {
   if (MANUAL_HOST) return MANUAL_HOST;
 
+  // A configured public API URL (trailing slashes trimmed).
+  const configured = (
+    process.env.EXPO_PUBLIC_API_URL ||
+    (Constants.expoConfig?.extra as { apiUrl?: string } | undefined)?.apiUrl ||
+    ''
+  ).replace(/\/+$/, '');
+
+  // Standalone/production build: no dev server to sniff — the configured URL is
+  // the only way to reach the backend.
+  if (!__DEV__) {
+    if (configured) return configured;
+    console.warn(
+      '[api] No backend URL configured for this build. Set EXPO_PUBLIC_API_URL ' +
+        '(eas.json) or expo.extra.apiUrl (app.json) — network requests will fail.'
+    );
+    return `http://localhost:${BACKEND_PORT}`;
+  }
+
+  // Dev (Expo Go): an explicit configured URL wins; else auto-detect the LAN IP.
+  if (configured) return configured;
   const hostUri =
     Constants.expoConfig?.hostUri ??
     // Fallbacks for older Expo runtimes
