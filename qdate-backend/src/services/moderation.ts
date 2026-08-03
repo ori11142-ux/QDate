@@ -70,6 +70,21 @@ export function isBlocked(user: UserDoc): { blocked: boolean; reason?: string } 
 }
 
 /**
+ * Mongo filter fragment that EXCLUDES currently-blocked accounts — banned
+ * (permanent) or suspended with an unexpired `suspendedUntil`. Mirrors isBlocked().
+ * AND this into a find() (spread it in) so banned/suspended users are never
+ * surfaced as matches or calibration cards.
+ */
+export function notBlockedQuery(now: Date = new Date()): Record<string, unknown> {
+  return {
+    $nor: [
+      { moderationStatus: 'banned' },
+      { moderationStatus: 'suspended', suspendedUntil: { $gt: now } },
+    ],
+  };
+}
+
+/**
  * Recompute a reported user's standing from the full history of rule-violating
  * reports against them. The score is weighted by severity and de-duplicated per
  * reporter (each distinct reporter contributes only their most-severe report),

@@ -1,6 +1,7 @@
 import { Types } from 'mongoose';
 import { SwipeModel } from '../models/Swipe';
 import { UserDoc, UserModel } from '../models/User';
+import { notBlockedQuery } from './moderation';
 
 // Calibration decks are now built from REAL profiles instead of a static demo
 // library:
@@ -47,7 +48,8 @@ async function eligibleProfiles(userId: string | Types.ObjectId): Promise<UserDo
   const pref = (me.get('agePreference') as { min?: number; max?: number } | undefined) ?? {};
   const min = pref.min ?? 18;
   const max = pref.max ?? 99;
-  const others = await UserModel.find({ _id: { $ne: me._id } });
+  // Never calibrate on banned/suspended accounts.
+  const others = await UserModel.find({ _id: { $ne: me._id }, ...notBlockedQuery() });
   // Calibrate only on people you'd date — right gender and inside your age range.
   return others.filter((c) => attractedTo(me.attraction, c.gender) && c.age >= min && c.age <= max);
 }

@@ -4,6 +4,7 @@ import { MatchDoc, MatchModel } from '../models/Match';
 import { scoreCandidateHeuristicML, scoreFromFeatures, learnWeightsFromOutcomes } from '../ml/ranker';
 import { extractUserFeatures, UserFeatureVector } from '../ml/features';
 import { getGlobalUsableTasteUsers } from '../ml/faceTaste';
+import { notBlockedQuery } from './moderation';
 
 type Phase = 'phase_1' | 'phase_2';
 
@@ -65,8 +66,8 @@ function learningDay(user: UserDoc): number {
  */
 /** Does someone with this `attraction` want to be matched with this `gender`? */
 function attractedTo(attraction: string | null | undefined, gender: string | null | undefined): boolean {
-  if (!attraction) return true; // no preference recorded → don't filter them out
-  if (attraction === 'both') return true;
+  if (!attraction || attraction === 'both') return true; // no preference → don't filter
+  if (!gender) return true; // the other side's gender isn't recorded → stay lenient
   if (attraction === 'men') return gender === 'man';
   if (attraction === 'women') return gender === 'woman';
   return true;
@@ -114,13 +115,22 @@ export function selectReciprocalMatch<T>(
 }
 
 async function findBestCandidateWithScore(
-  requester: UserDoc
+  requester: UserDoc,
+  phase?: Phase
 ): Promise<{ candidate: UserDoc; score: number } | null> {
   const excludedIds: Types.ObjectId[] = [requester._id as Types.ObjectId];
 
-  // Everyone currently busy in a pairing (one-at-a-time applies to candidates too).
+  // Everyone currently busy in a LIVE pairing (one-at-a-time applies to candidates
+  // too). A pending/active match only counts while it hasn't expired — otherwise a
+  // pair who never revealed would stay "busy" forever and silently vanish from
+  // everyone's pool. A `connected` match (open chat) keeps them busy regardless of
+  // expiresAt. (The expireStaleMatches sweep marks the stale ones; this also covers
+  // the window before the next sweep runs.)
   const busy = await MatchModel.find({
-    status: { $in: ['pending_reveal', 'active', 'connected'] },
+    $or: [
+      { status: 'connected' },
+      { status: { $in: ['pending_reveal', 'active'] }, expiresAt: { $gt: new Date() } },
+    ],
   }).select('userId');
   for (const m of busy) {
     excludedIds.push(m.userId as Types.ObjectId);
@@ -136,13 +146,21 @@ async function findBestCandidateWithScore(
 
   // Load the select:false face fields so the ranker's Phase-2 taste blend has
   // them without any per-candidate query.
-  const candidates = await UserModel.find({ _id: { $nin: excludedIds } }).select(
+  // Exclude requester + already-matched + busy, and NEVER surface banned or
+  // actively-suspended accounts.
+  const candidates = await UserModel.find({ _id: { $nin: excludedIds }, ...notBlockedQuery() }).select(
     '+faceEmbedding +faceTasteVector +faceTasteMargin +faceTasteLikes +faceTasteDislikes'
   );
 
   // Keep only candidates who are a mutual gender/attraction AND age-range match.
+  // In Phase 2 (a high-investment 7-day curated pairing) also exclude anyone still
+  // in their Phase-1 learning period — pairing them here would strand them on the
+  // 7-day cadence/cooldown instead of daily matches.
   const eligible = candidates.filter(
-    (c) => genderCompatible(requester, c) && ageCompatible(requester, c)
+    (c) =>
+      genderCompatible(requester, c) &&
+      ageCompatible(requester, c) &&
+      (phase !== 'phase_2' || learningDay(c) >= LEARNING_DAYS)
   );
   if (eligible.length === 0) return null;
 
@@ -278,7 +296,7 @@ export async function generateMatchForUser(
     }
   }
 
-  const best = await findBestCandidateWithScore(requester);
+  const best = await findBestCandidateWithScore(requester, phase);
   if (!best) return null;
 
   const { candidate, score: learnedScore } = best;
