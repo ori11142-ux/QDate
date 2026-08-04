@@ -14,7 +14,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://REPLACE-WITH-YOUR-DEPLOYED-BACKEND"
+        "EXPO_PUBLIC_API_URL": "https://qdate.onrender.com"
       }
     },
     "production": {
@@ -22,7 +22,7 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://REPLACE-WITH-YOUR-DEPLOYED-BACKEND"
+        "EXPO_PUBLIC_API_URL": "https://qdate.onrender.com"
       }
     }
   },
