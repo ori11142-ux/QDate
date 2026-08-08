@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  I18nManager,
   Image,
   Pressable,
   SafeAreaView,
@@ -319,7 +320,9 @@ const styles = StyleSheet.create({
   },
 
   bottomBar: {
-    flexDirection: 'row',
+    // Keep nope-left / like-right regardless of the device's RTL locale — a
+    // Hebrew/Arabic phone would otherwise mirror the row and swap the buttons.
+    flexDirection: I18nManager.isRTL ? 'row-reverse' : 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.xl,

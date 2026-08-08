@@ -8,6 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuth } from '../auth/AuthContext';
 import { interestEmoji, interestLabel } from '../data/interests';
@@ -41,6 +42,7 @@ interface Props {
 
 export function ProfileMenu({ visible, onClose, onEditProfile }: Props) {
   const { user, signOut } = useAuth();
+  const insets = useSafeAreaInsets();
   const [guidelinesOpen, setGuidelinesOpen] = useState(false);
   if (!user) return null;
 
@@ -122,7 +124,15 @@ export function ProfileMenu({ visible, onClose, onEditProfile }: Props) {
             )}
           </ScrollView>
 
-          <View style={styles.actions}>
+          <View
+            style={[
+              styles.actions,
+              // Clear the Android nav bar so "Sign out" isn't hidden behind the
+              // phone's buttons. Floored because insets.bottom is often under-
+              // reported (0) under Expo Go edge-to-edge.
+              { paddingBottom: Math.max(insets.bottom, spacing.lg) + spacing.sm },
+            ]}
+          >
             <Pressable style={styles.editBtn} onPress={onEditProfile}>
               <Text style={styles.editBtnText}>Edit profile</Text>
             </Pressable>
