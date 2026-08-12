@@ -32,7 +32,7 @@ It runs a **two-phase lifecycle**:
 - **Expo** (SDK 54) + **React Native** (TypeScript) — one codebase for iOS & Android
 - **React Navigation** (stack + bottom tabs)
 - **AsyncStorage** for the persisted session
-- Runs in **Expo Go** during development
+- Built into a native **Android app** with **EAS Build**
 
 ---
 
@@ -61,13 +61,12 @@ QDate2/
 
 ---
 
-## Getting started (development)
+## Getting started
 
 ### Prerequisites
 - **Node.js 18+** and npm
 - A **MongoDB Atlas** account (free tier is fine) — you'll need a connection string
-- **Expo Go** installed on your phone (iOS App Store / Google Play)
-- Your **phone and computer on the same Wi-Fi**
+- An **Android phone** to install the app (see **[DEPLOY.md](DEPLOY.md)** to build the APK)
 
 ### 1. Backend
 
@@ -92,19 +91,17 @@ npm run dev
 
 It listens on **http://localhost:5000**. Verify it's up: open **http://localhost:5000/api/health** → `{"ok":true}`.
 
-### 2. Mobile app
+### 2. Android app
 
-In a second terminal:
+The mobile client ships as a real, installable **Android app**. Build it with EAS and install the APK on your phone — the full walkthrough (hosting the backend, setting the URL, running the build) is in **[DEPLOY.md](DEPLOY.md)**. In short:
 
 ```bash
 cd qdate-mobile
 npm install
-npm start          # = npx expo start
+eas build -p android --profile preview   # → an installable .apk
 ```
 
-Scan the QR code with **Expo Go** on your phone. The app **auto-detects your computer's LAN IP** and talks to the backend on port 5000 — so as long as the phone and computer share Wi-Fi and the backend is running, it just works.
-
-> If auto-detection fails (some emulators/networks), set `MANUAL_HOST` at the top of `qdate-mobile/src/api.ts` to `http://<your-computer-ip>:5000` (find your IP with `ipconfig` on Windows).
+The app reads its backend URL from `EXPO_PUBLIC_API_URL` in `eas.json`, so your backend must be **deployed** (reachable over the internet, not just `localhost`) and that URL set before you build. Download the finished APK and install it on your phone.
 
 ---
 
@@ -143,14 +140,14 @@ Example logins after seeding: `p2_woman_0@qdate.test` / `qdate1234` (Phase 2), o
 **Mobile** (`qdate-mobile/`)
 | Command | What it does |
 |---|---|
-| `npm start` | Start the Expo dev server (scan the QR in Expo Go) |
-| `npm run android` / `npm run ios` | Open directly on an emulator/simulator |
+| `eas build -p android --profile preview` | Build an installable Android APK |
+| `eas build -p android --profile production` | Build a Play-Store bundle (`.aab`) |
 
 ---
 
-## Building a real Android app
+## Building & hosting
 
-Expo Go is for development. To produce an **installable APK** (or a Play-Store bundle), the backend must be hosted and the app built with EAS. Step-by-step instructions — hosting the backend on Render, configuring Atlas, and running the build — are in **[DEPLOY.md](DEPLOY.md)**.
+To ship the Android app you host the backend and build the APK with EAS. Full step-by-step instructions — hosting the backend on Render, configuring Atlas, and running the build — are in **[DEPLOY.md](DEPLOY.md)**.
 
 ---
 
