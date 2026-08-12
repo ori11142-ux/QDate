@@ -1,3 +1,6 @@
+// Matchmaker: the core engine that picks each user's match. It scores candidates
+// with the ML ranker, applies gender/age/reciprocity rules, enforces the
+// "one match at a time" + phase/cooldown cadence, and creates both sides of a pairing.
 import { Types } from 'mongoose';
 import { UserDoc, UserModel } from '../models/User';
 import { MatchDoc, MatchModel } from '../models/Match';
@@ -114,6 +117,8 @@ export function selectReciprocalMatch<T>(
   return ranked.length > 0 ? ranked[0].item : null;
 }
 
+// The heart of matching: exclude self/busy/already-matched people, keep only
+// gender+age-eligible ones, score the whole pool, then apply the reciprocity gate.
 async function findBestCandidateWithScore(
   requester: UserDoc,
   phase?: Phase
@@ -217,6 +222,7 @@ async function findBestCandidateWithScore(
   return chosen ? { candidate: chosen.candidate, score: chosen.score } : null;
 }
 
+// Public wrapper that returns just the best-matching user (the score is dropped).
 export async function findBestCandidate(requester: UserDoc): Promise<UserDoc | null> {
   const best = await findBestCandidateWithScore(requester);
   return best?.candidate ?? null;

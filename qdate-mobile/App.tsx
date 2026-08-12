@@ -1,3 +1,5 @@
+// App entry point: sets up the global providers (auth + navigation) that the
+// whole app renders inside.
 import 'react-native-gesture-handler';
 import React from 'react';
 import { StatusBar } from 'expo-status-bar';
@@ -19,6 +21,7 @@ const navTheme = {
   colors: { ...DefaultTheme.colors, background: colors.background },
 };
 
+// Root component: wraps the navigator in the auth provider and app theme.
 export default function App() {
   return (
     <AuthProvider>

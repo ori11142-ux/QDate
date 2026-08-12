@@ -1,3 +1,5 @@
+// Optional face/biometric-consent UI for onboarding: an explainer modal plus a
+// checkbox letting the user opt in to (or skip) face-based matching.
 import React, { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 

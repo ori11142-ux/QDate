@@ -1,3 +1,5 @@
+// Auth state for the whole app: holds the current user, restores a saved session
+// on launch, and exposes register/login/logout/profile helpers via useAuth().
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
 import { api, BackendUser, ProfileUpdatePayload } from '../api';
@@ -38,6 +40,7 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+// Convert the backend's user shape into the trimmed shape we keep on-device.
 function backendUserToStored(u: BackendUser): StoredUser {
   return {
     id: u.id,
@@ -58,6 +61,7 @@ function backendUserToStored(u: BackendUser): StoredUser {
   };
 }
 
+// Provides the auth context to the tree and keeps the user in sync with storage.
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<StoredUser | null>(null);
   const [isHydrating, setIsHydrating] = useState(true);
@@ -124,6 +128,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Hook screens use to read auth + call login/register/etc; errors if used
+// outside an AuthProvider.
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) {

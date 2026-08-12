@@ -1,3 +1,5 @@
+// Authentication service: creates accounts (hashing the password) and verifies
+// logins. Also stops banned/suspended users from signing in.
 import bcrypt from 'bcryptjs';
 import { UserModel, UserDoc } from '../models/User';
 import { sanitizeInterestTags } from '../data/interests';
@@ -7,6 +9,7 @@ import { sanitizeAgePreference } from './users';
 
 const SALT_ROUNDS = 10;
 
+// Typed error so the login/register routes can map each failure to the right response.
 export class AuthError extends Error {
   constructor(
     public code: 'EMAIL_EXISTS' | 'INVALID_CREDENTIALS' | 'ACCOUNT_BLOCKED',

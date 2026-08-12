@@ -1,3 +1,5 @@
+// A live countdown pill (re-renders every second) used for match expiry and the
+// 7-day Phase-2 cooldown; calls onComplete once when it hits zero.
 import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { colors, radius, spacing, typography } from '../theme';
@@ -8,6 +10,7 @@ interface Props {
   onComplete?: () => void; // fired once when the countdown reaches zero
 }
 
+// Turns the milliseconds left into a human-readable string.
 function formatRemaining(ms: number): string {
   if (ms <= 0) return '00:00:00';
   const total = Math.floor(ms / 1000);
@@ -22,6 +25,7 @@ function formatRemaining(ms: number): string {
   return `${pad(h)}:${pad(m)}:${pad(s)}`;
 }
 
+// Displays the time left until `expiresAt`, ticking down once per second.
 export function CountdownTimer({ expiresAt, compact, onComplete }: Props) {
   const targetMs = new Date(expiresAt).getTime();
   const [remaining, setRemaining] = useState(targetMs - Date.now());

@@ -1,3 +1,5 @@
+// Mongoose model for a lightweight message-metadata event: just message length
+// and response time (no text), logged as a compact signal for ML on chat style.
 import { Schema, model, InferSchemaType, HydratedDocument } from 'mongoose';
 
 const messageEventSchema = new Schema(

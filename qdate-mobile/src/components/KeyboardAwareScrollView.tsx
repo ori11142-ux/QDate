@@ -1,3 +1,5 @@
+// Shared ScrollView wrapper used by the app's form/chat screens so a focused
+// text field stays visible above the on-screen keyboard.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Dimensions,

@@ -1,3 +1,5 @@
+// Swipe service: records calibration swipes (interests & looks) and reports
+// per-deck like-rates. A "looks" swipe also retrains the user's visual taste.
 import { Types } from 'mongoose';
 import { SwipeDoc, SwipeModel } from '../models/Swipe';
 import { updateFaceTaste } from '../ml/faceTaste';
@@ -10,6 +12,7 @@ export type RecordSwipeInput = {
   responseTimeMs?: number;
 };
 
+// Save one calibration swipe; for a "looks" swipe, also recompute face-taste in the background.
 export async function recordSwipe(input: RecordSwipeInput): Promise<SwipeDoc> {
   const swipe = await SwipeModel.create({ ...input, swipedAt: new Date() });
   // A looks-swipe changes this user's visual taste — recompute in the background,

@@ -1,3 +1,5 @@
+// Mongoose model for post-match feedback: after a match ends each user rates how
+// willing they were to meet (1-5) and how compatible communication felt (1-5).
 import { Schema, model, InferSchemaType, HydratedDocument } from 'mongoose';
 
 const feedbackSchema = new Schema(

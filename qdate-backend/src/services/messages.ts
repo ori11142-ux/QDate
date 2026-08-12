@@ -1,3 +1,5 @@
+// Chat message persistence. Saves each message and computes reply latency versus
+// the other person's last message — the timing signal the matching model learns from.
 import { Types } from 'mongoose';
 import { MessageDoc, MessageModel } from '../models/Message';
 

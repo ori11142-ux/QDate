@@ -1,3 +1,5 @@
+// Bottom-sheet modal for reporting another user: pick a category, add optional
+// details, and submit — opened from chat/profile views.
 import React, { useEffect, useState } from 'react';
 import {
   Keyboard,
@@ -23,6 +25,7 @@ interface Props {
   onSubmit: (category: string, reason: string) => void;
 }
 
+// The report form; clears itself each time it opens and lifts above the keyboard.
 export function ReportUserModal({
   visible,
   reportedName,

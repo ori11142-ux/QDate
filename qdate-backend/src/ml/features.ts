@@ -1,3 +1,5 @@
+// Feature extraction: turns a user's raw DB records (swipes, messages, feedback)
+// into one numeric "feature vector" the matchmaker/ranker can score pairs on.
 import { Types } from 'mongoose';
 import { UserDoc, UserModel } from '../models/User';
 import { MessageModel } from '../models/Message';
@@ -46,6 +48,7 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
+// Weights a swipe by how fast it was: a snap decision is a stronger signal than a slow one.
 export function confidenceFromResponseMs(responseTimeMs: number | null | undefined): number {
   if (responseTimeMs == null) return 1;
   if (responseTimeMs <= 1500) return 1.2;
@@ -83,6 +86,7 @@ function preferenceToArray(pref: PreferenceVector): number[] {
   return CALIBRATION_TAGS.map((t) => pref[t] ?? 0);
 }
 
+// How well a candidate's tags line up with the user's learned likes/dislikes (0-1, 0.5 = neutral).
 export function preferenceAlignment(preferences: PreferenceVector, candidateTags: string[]): number {
   if (candidateTags.length === 0) return 0.5;
   let score = 0;
@@ -98,12 +102,14 @@ export function preferenceAlignment(preferences: PreferenceVector, candidateTags
   return clamp((score / matched + 1) / 2, 0, 1);
 }
 
+// How much two people's time-of-day activity patterns overlap (0-1).
 export function activityOverlap(a: UserFeatureVector['activityBuckets'], b: UserFeatureVector['activityBuckets']): number {
   const av = [a.morning, a.afternoon, a.evening, a.night];
   const bv = [b.morning, b.afternoon, b.evening, b.night];
   return (cosineSimilarity(av, bv) + 1) / 2;
 }
 
+// Turns a user's swipes into a taste vector: per tag, likes add and dislikes subtract (confidence-weighted).
 export async function buildPreferenceVector(
   userId: string | Types.ObjectId,
   mode: 'interests' | 'looks'
@@ -168,6 +174,7 @@ function bucketForHour(hour: number): keyof UserFeatureVector['activityBuckets']
   return 'night';
 }
 
+// Reads a user's last 30 days of activity from the DB and assembles their full feature vector.
 export async function extractUserFeatures(user: UserDoc): Promise<UserFeatureVector> {
   const since = new Date(Date.now() - 30 * DAY_MS);
   const uid = new Types.ObjectId(String(user._id));
@@ -281,6 +288,7 @@ export async function extractUserFeatures(user: UserDoc): Promise<UserFeatureVec
   };
 }
 
+// Cosine similarity between two people's taste vectors, rescaled to 0-1.
 export function preferenceVectorSimilarity(a: PreferenceVector, b: PreferenceVector): number {
   const aVec = preferenceToArray(a);
   const bVec = preferenceToArray(b);

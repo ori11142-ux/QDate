@@ -1,3 +1,5 @@
+// Community-guidelines UI: the rules list, a full-screen modal, and the
+// onboarding "I agree" checkbox — all sharing one styled list of rules.
 import React, { useState } from 'react';
 import {
   Modal,

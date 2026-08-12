@@ -1,3 +1,4 @@
+// Shared UI: a thin horizontal progress bar (used for onboarding step progress).
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { colors, radius } from '../theme';
@@ -7,6 +8,7 @@ interface Props {
   height?: number;
 }
 
+// Fills a track from 0 to 1 (input clamped) to show how far along something is.
 export function ProgressBar({ progress, height = 6 }: Props) {
   const clamped = Math.max(0, Math.min(1, progress));
   return (

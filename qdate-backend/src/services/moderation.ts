@@ -1,3 +1,5 @@
+// Moderation service: guideline acceptance, user reports, and the strike system
+// that warns/suspends/bans accounts and keeps blocked users out of matching.
 import { Types } from 'mongoose';
 
 import { UserDoc, UserModel } from '../models/User';
@@ -12,6 +14,7 @@ import {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+// Typed error so the report routes can map each failure to the right response.
 export class ModerationError extends Error {
   constructor(
     public code:

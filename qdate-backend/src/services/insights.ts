@@ -1,3 +1,5 @@
+// Insights service: rolls up a user's real activity (messaging, match outcomes,
+// swipe like-rates) into the summary shown on their personal Insights screen.
 import { Types } from 'mongoose';
 import { UserModel } from '../models/User';
 import { MatchModel } from '../models/Match';

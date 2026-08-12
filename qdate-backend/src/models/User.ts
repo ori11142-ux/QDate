@@ -1,3 +1,6 @@
+// Mongoose model for a User account: profile, dating preferences, matching phase,
+// moderation standing, and the ML face-taste vectors. The central document the
+// rest of the app is built around.
 import { Schema, model, InferSchemaType, HydratedDocument } from 'mongoose';
 
 export const DATING_INTENTS = ['long_term', 'casual', 'explore', 'friendship'] as const;

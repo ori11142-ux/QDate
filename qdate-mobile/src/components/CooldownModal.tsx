@@ -1,3 +1,5 @@
+// Confirmation modal shown before skipping a curated Phase-2 match, warning the
+// user that their next curated match won't arrive for 7 days.
 import React from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -9,6 +11,7 @@ interface Props {
   onConfirm: () => void;
 }
 
+// Asks the user to reconsider (or confirm) skipping their curated match.
 export function CooldownModal({ visible, onCancel, onConfirm }: Props) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>

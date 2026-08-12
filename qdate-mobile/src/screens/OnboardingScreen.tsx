@@ -1,3 +1,6 @@
+// OnboardingScreen — step 2 of sign-up. Collects dating preferences (intent,
+// communication style, gender, who you're into, age range, interests) plus
+// guideline/biometric consent, then calls register() to create the account.
 import React, { useState } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
@@ -49,6 +52,7 @@ const ATTRACTION_OPTIONS: { value: Attraction; label: string }[] = [
   { value: 'both', label: 'Both' },
 ];
 
+// The preferences step: gathers dating intent + tastes, then creates the account.
 export function OnboardingScreen({ route }: Props) {
   const { name, email, password, age, authMethod, photos, bio } = route.params;
   const { register } = useAuth();
@@ -257,6 +261,7 @@ export function OnboardingScreen({ route }: Props) {
   );
 }
 
+// A single-select radio option (a dot that fills in when chosen).
 function Radio({
   label,
   selected,
@@ -276,6 +281,7 @@ function Radio({
   );
 }
 
+// A 1-to-5 star rating input (used for "how important is shared intellect?").
 function StarRow({
   value,
   onChange,

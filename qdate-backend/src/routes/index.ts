@@ -1,3 +1,6 @@
+// The app's REST API: every /api/* endpoint the mobile client calls — auth, profiles,
+// matches, messages, swipes, guidelines/moderation, insights, and learning — all wired
+// onto a single Express router that index.ts mounts.
 import { Router } from 'express';
 import mongoose, { Types } from 'mongoose';
 
@@ -58,11 +61,14 @@ export const router = Router();
 const RATE_WINDOW_MS = 60 * 1000;
 const rateBuckets = new Map<string, { count: number; resetAt: number }>();
 
+// Validate a string and turn it into a Mongo document id (null if it isn't a valid one).
 function parseObjectId(value: string): Types.ObjectId | null {
   if (!Types.ObjectId.isValid(value)) return null;
   return new Types.ObjectId(value);
 }
 
+// Middleware factory: caps how many times one IP can hit an endpoint each minute,
+// replying 429 ("slow down") once the limit is exceeded.
 function softRateLimit(bucketKey: string, maxPerMinute: number) {
   return (req: any, res: any, next: any) => {
     const ip = req.ip ?? req.socket?.remoteAddress ?? 'unknown';
@@ -96,6 +102,8 @@ router.get('/health', (_req, res) => {
 
 // ─── Auth ───────────────────────────────────────────────────────────────────
 
+// Create a new account: checks the required fields (exactly 4 photos, guidelines
+// accepted), then, only if the user consented, builds their face signature in the background.
 router.post('/auth/register', async (req, res) => {
   try {
     const {
@@ -164,6 +172,7 @@ router.post('/auth/register', async (req, res) => {
   }
 });
 
+// Log in with email + password; returns the user, or an error for bad credentials or a blocked account.
 router.post('/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;

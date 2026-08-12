@@ -1,3 +1,5 @@
+// Mystery "reveal" card for the daily match: an idle glow, then a tap triggers a
+// shake -> flash -> sparkle-burst animation before the matched profile is shown.
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
@@ -21,6 +23,7 @@ type Phase = 'idle' | 'animating';
 const PARTICLE_COUNT = 10;
 const PARTICLE_DISTANCE = 140;
 
+// Animated card the user taps to dramatically reveal today's one match.
 export function MatchRevealCard({
   onRevealComplete,
   buttonLabel = 'Reveal Today\'s Match',

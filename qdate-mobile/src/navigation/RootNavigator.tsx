@@ -1,3 +1,6 @@
+// Root navigation for the app: picks the logged-out flow (Welcome/Login/
+// Register/Onboarding) vs. the signed-in app (bottom tabs + Chat/EditProfile),
+// and shows a splash while we check for a saved session.
 import React, { useState } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import {
@@ -56,6 +59,7 @@ export type MainTabParamList = {
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
+// Top bar with the hamburger menu button and the QDate brand name.
 function AppBar({ onMenuPress }: { onMenuPress: () => void }) {
   const insets = useSafeAreaInsets();
   return (
@@ -69,6 +73,7 @@ function AppBar({ onMenuPress }: { onMenuPress: () => void }) {
   );
 }
 
+// The signed-in shell: the four bottom tabs plus the slide-in profile menu.
 function MainTabs({ navigation }: NativeStackScreenProps<RootStackParamList, 'Main'>) {
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -156,6 +161,7 @@ const appBarStyles = StyleSheet.create({
   spacer: { width: 40 },
 });
 
+// Branded loading screen shown while we read the saved user from storage.
 function HydrationSplash() {
   return (
     <SafeAreaView style={splashStyles.safe}>
@@ -174,6 +180,7 @@ const splashStyles = StyleSheet.create({
   brand: { ...typography.display, fontSize: 36, color: colors.text },
 });
 
+// Top-level navigator: shows the app if signed in, otherwise the auth screens.
 export function RootNavigator() {
   const { user, isHydrating } = useAuth();
 

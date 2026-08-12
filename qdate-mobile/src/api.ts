@@ -71,6 +71,8 @@ const API_BASE = `${resolveBackendHost()}/api`;
 // Backend now supports match/insights/learning/calibration endpoints.
 const USE_MOCK_API = false;
 
+// Shared fetch helper: adds the base URL + JSON headers and turns HTTP/network
+// failures into friendly Error messages the screens can show.
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
   try {
@@ -173,6 +175,7 @@ export type ReportResult = {
   alreadyReported: boolean;
 };
 
+// The app's API surface: every backend call the mobile app makes lives here.
 export const api = {
   // ── Auth — ALWAYS hits the real backend ──────────────────────────────────
   async register(payload: RegisterPayload): Promise<BackendUser> {

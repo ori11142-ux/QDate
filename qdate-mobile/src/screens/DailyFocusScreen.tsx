@@ -1,3 +1,6 @@
+// DailyFocusScreen — the heart of the app: the single match reveal. Shows one
+// "mystery" match, lets the user reveal it, then open a chat or skip. Handles
+// both Phase 1 (daily, learning period) and Phase 2 (weekly, curated) pacing.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { CompositeScreenProps } from '@react-navigation/native';
@@ -50,6 +53,8 @@ const COMM_LABELS: Record<string, string> = {
   meet_in_person: 'Meet in person',
 };
 
+// Per-phase copy and behaviour (titles, reveal labels, skip cooldown UX). Lets
+// the same screen present as either the daily learning match or a weekly curated one.
 const PHASE_CONFIG: Record<
   Phase,
   {
@@ -91,6 +96,7 @@ const PHASE_CONFIG: Record<
   },
 };
 
+// The screen that shows your one match: mystery → reveal → open chat or skip.
 export function DailyFocusScreen({ navigation }: Props) {
   const { user, syncPhase } = useAuth();
   const userId = user?.id ?? '';

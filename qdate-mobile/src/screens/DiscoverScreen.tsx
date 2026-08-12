@@ -1,3 +1,6 @@
+// DiscoverScreen — the swipe/calibration tab. Two decks (interests and looks)
+// let the user like/skip cards so the system learns their taste. Swiping here
+// does NOT create matches; it only feeds the calibration signal on the backend.
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -21,6 +24,7 @@ import {
 } from '../types';
 import { colors, radius, spacing, typography } from '../theme';
 
+// The Discover tab: two swipeable decks that teach the system your preferences.
 export function DiscoverScreen() {
   const { user } = useAuth();
   const userId = user?.id ?? '';
@@ -47,6 +51,7 @@ export function DiscoverScreen() {
       .finally(() => setLoading(false));
   }, []);
 
+  // Records one like/skip to the backend and advances the current deck.
   function handleSwipe(liked: boolean, cardId: string) {
     api
       .submitCalibrationSwipe(userId, {
@@ -180,6 +185,7 @@ export function DiscoverScreen() {
   );
 }
 
+// The toggle pill that switches between the "interests" and "looks" decks.
 function ModeChip({
   label,
   active,
@@ -196,6 +202,7 @@ function ModeChip({
   );
 }
 
+// Face of an interests card: a person's interest tags and bio, no photo.
 function InterestCardBody({ card }: { card: InterestCard }) {
   const tags = card.tags ?? [];
   // Legacy static cards still carry an icon/label; new ones are real profiles.
@@ -229,6 +236,7 @@ function InterestCardBody({ card }: { card: InterestCard }) {
   );
 }
 
+// Face of a looks card: just the photo (and optional name), swipe on appearance.
 function LookCardBody({ card }: { card: LookCard }) {
   return (
     <View style={lookStyles.body}>

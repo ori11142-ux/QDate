@@ -1,3 +1,6 @@
+// RegisterScreen — step 1 of sign-up. Collects the basics (photos, bio, name,
+// email, password, age), validates them, then hands off to Onboarding (step 2)
+// which finishes the preferences and actually creates the account.
 import React, { useState } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
@@ -21,6 +24,7 @@ const BIO_MAX = 100;
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Register'>;
 
+// The account-basics step: validates the fields, then navigates to Onboarding.
 export function RegisterScreen({ navigation, route }: Props) {
   const { authMethod } = route.params;
   const insets = useSafeAreaInsets();
@@ -153,6 +157,7 @@ interface FieldProps {
   secureTextEntry?: boolean;
 }
 
+// A labelled text input with an optional hint line — one form row.
 function Field({
   label,
   value,

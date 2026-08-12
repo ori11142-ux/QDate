@@ -1,3 +1,4 @@
+// Onboarding control for choosing a preferred age range (two number inputs).
 import React, { useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 

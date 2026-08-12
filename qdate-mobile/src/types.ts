@@ -7,12 +7,14 @@ export type Attraction = 'men' | 'women' | 'both';
 export type Phase = 'phase_1' | 'phase_2';
 export type CalibrationMode = 'interests' | 'looks';
 
+// What a user wants out of dating — feeds the matching logic and app tone.
 export interface IntentProfile {
   intent: DatingIntent;
   sharedIntellectImportance: number; // 1..5
   commStyle: CommStyle;
 }
 
+// One daily match: the candidate's profile plus its reveal/connect status.
 export interface Match {
   matchId: string;
   conversationId?: string;
@@ -49,6 +51,7 @@ export interface FeedbackPayload {
   communicationCompatibility: number;
 }
 
+// The numbers behind the Insights screen — engagement, outcomes, calibration.
 export interface InsightsSummary {
   intentScore: number;
   avgReplyTimeHours: number | null;

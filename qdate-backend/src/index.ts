@@ -1,3 +1,5 @@
+// Server entry point: connects to MongoDB, starts the Express API, runs a periodic
+// background sweep that expires stale matches, and shuts everything down cleanly.
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';

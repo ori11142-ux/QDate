@@ -1,3 +1,5 @@
+// Profile-photo grid used in onboarding/editing: pick images from the library,
+// shrink + compress them, and hand each back as an upload-ready data URI.
 import React from 'react';
 import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';

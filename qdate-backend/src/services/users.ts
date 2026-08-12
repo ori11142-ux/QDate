@@ -1,3 +1,5 @@
+// User service: create/find users and update profile fields, plus small helpers
+// for the ML pipeline (intent score) and age-preference validation.
 import { Types } from 'mongoose';
 import { User, UserDoc, UserModel } from '../models/User';
 
@@ -60,6 +62,7 @@ export function sanitizeAgePreference(pref: unknown): { min: number; max: number
   return { min, max };
 }
 
+// Apply a partial profile edit, re-checking the schema rules on the changed fields.
 export async function updateUserProfile(
   id: string | Types.ObjectId,
   updates: ProfileUpdate
@@ -69,6 +72,7 @@ export async function updateUserProfile(
   return UserModel.findByIdAndUpdate(id, updates, { new: true, runValidators: true });
 }
 
+// Move a user between the two matching stages (phase_1 learning → phase_2 curated).
 export async function setUserPhase(
   id: string | Types.ObjectId,
   phase: 'phase_1' | 'phase_2'

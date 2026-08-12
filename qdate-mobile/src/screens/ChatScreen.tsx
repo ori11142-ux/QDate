@@ -1,3 +1,6 @@
+// ChatScreen — the 1-to-1 conversation for a match. The chat only unlocks once
+// BOTH people have opened it; until then it shows a "waiting" state. Messages
+// are polled from the backend and sent optimistically. Also hosts the report flow.
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
@@ -32,6 +35,7 @@ const STATUS_POLL_MS = 2500;
 // iOS reports the full height, so it needs none.
 const ANDROID_KB_EXTRA = 48;
 
+// The chat screen: unlocks once both have opened it, then polls & sends messages.
 export function ChatScreen({ navigation, route }: Props) {
   const { matchId, conversationId, candidateName, candidatePhotoUrl } = route.params;
   const { user } = useAuth();
@@ -312,6 +316,7 @@ export function ChatScreen({ navigation, route }: Props) {
   );
 }
 
+// One message bubble — aligned right and coloured when it's mine, left otherwise.
 function Bubble({ message }: { message: ChatMessage }) {
   const mine = message.fromMe;
   return (

@@ -1,3 +1,5 @@
+// Match data-access service: creates matches and drives their status through the
+// "slow dating" lifecycle (pending_reveal → active → connected / skipped / expired).
 import { Types } from 'mongoose';
 import { MatchDoc, MatchModel } from '../models/Match';
 
@@ -33,6 +35,7 @@ export async function getCurrentMatchForUser(
   }).sort({ createdAt: -1 });
 }
 
+/** Reveal the match: pending_reveal → active, stamping when it happened. */
 export async function markRevealed(
   matchId: string | Types.ObjectId
 ): Promise<MatchDoc | null> {
@@ -43,6 +46,7 @@ export async function markRevealed(
   );
 }
 
+/** User passed on this match → status 'skipped'. */
 export async function markSkipped(
   matchId: string | Types.ObjectId
 ): Promise<MatchDoc | null> {
@@ -53,6 +57,7 @@ export async function markSkipped(
   );
 }
 
+/** A user opened the chat with their match → status 'connected'. */
 export async function markConnected(
   matchId: string | Types.ObjectId
 ): Promise<MatchDoc | null> {

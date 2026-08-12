@@ -1,3 +1,5 @@
+// LoginScreen — email + password sign-in for returning users. On success the
+// auth context takes over and the app switches to the main tabs automatically.
 import React, { useState } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
@@ -17,6 +19,7 @@ import { colors, radius, spacing, typography } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
+// The log-in screen: validates the fields and calls login() from auth context.
 export function LoginScreen({ navigation }: Props) {
   const { login } = useAuth();
 

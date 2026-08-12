@@ -1,3 +1,6 @@
+// Calibration card catalog: the interests deck and the looks deck users swipe
+// during onboarding, plus the master list of "tag" axes those swipes map to.
+// These tags are the shared vocabulary every taste/preference vector is built from.
 export type CalibrationTag =
   // ── interest / lifestyle axes ──
   | 'active_lifestyle'
@@ -124,6 +127,7 @@ export const LOOK_CALIBRATION_DECK: LookCalibrationCard[] = [
   { id: 'look_10', name: 'Alex',   age: 33, tags: ['red_hair', 'slim_build', 'edgy_look'],          photoUrl: makeLabeledLookPhoto(['red_hair', 'slim_build', 'edgy_look']) },
 ];
 
+// Quick lookup from a (legacy static) card id to its tags, used when scoring swipes.
 export const CARD_TAGS_BY_ID: Record<string, CalibrationTag[]> = {
   ...Object.fromEntries(INTEREST_CALIBRATION_DECK.map((c) => [c.id, c.tags])),
   ...Object.fromEntries(LOOK_CALIBRATION_DECK.map((c) => [c.id, c.tags])),

@@ -1,3 +1,5 @@
+// MongoDB connection helpers (via Mongoose): open one shared connection on
+// startup and close it on shutdown.
 import mongoose from 'mongoose';
 
 let connecting: Promise<typeof mongoose> | null = null;
@@ -35,6 +37,7 @@ export async function connectToDb(): Promise<typeof mongoose> {
   }
 }
 
+// Close the MongoDB connection on graceful shutdown. No-op if already disconnected.
 export async function disconnectFromDb(): Promise<void> {
   if (mongoose.connection.readyState !== 0) {
     await mongoose.disconnect();

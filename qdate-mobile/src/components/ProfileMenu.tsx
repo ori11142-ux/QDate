@@ -1,3 +1,5 @@
+// Slide-in side panel showing the signed-in user's own profile (photos,
+// preferences, interests) plus edit / guidelines / sign-out actions.
 import React, { useState } from 'react';
 import {
   Image,
@@ -40,6 +42,7 @@ interface Props {
   onEditProfile: () => void;
 }
 
+// The side-drawer menu that shows the current user's profile and account actions.
 export function ProfileMenu({ visible, onClose, onEditProfile }: Props) {
   const { user, signOut } = useAuth();
   const insets = useSafeAreaInsets();
@@ -155,6 +158,7 @@ export function ProfileMenu({ visible, onClose, onEditProfile }: Props) {
   );
 }
 
+// Small label-on-left, value-on-right row used for the profile detail lines.
 function Detail({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.detailRow}>

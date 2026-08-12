@@ -1,3 +1,6 @@
+// The ranker: scores how compatible two users are (0-100) by weighting many
+// signals - intent, communication style, age, interests, and looks (which folds
+// in the learned face-taste model). Weights can adapt to real match outcomes.
 import { MatchModel } from '../models/Match';
 import { UserDoc } from '../models/User';
 import { FeedbackModel } from '../models/Feedback';
@@ -82,6 +85,7 @@ function normalizeWeights(weights: LearnedWeights): LearnedWeights {
   ) as LearnedWeights;
 }
 
+// Adjusts each scoring weight based on real match outcomes, once there's enough history.
 // Exported for the eval/demo harnesses (evalFaceTaste.ts, demoMatching.ts).
 export async function learnWeightsFromOutcomes(): Promise<LearnedWeights> {
   const [matchAgg, feedbackAgg] = await Promise.all([
@@ -143,6 +147,7 @@ export async function learnWeightsFromOutcomes(): Promise<LearnedWeights> {
   return normalizeWeights(learned);
 }
 
+// Combines every per-signal compatibility into one weighted 0-100 match score.
 // Exported (with an explicit global-taste-users arg) so tooling can score a pair
 // with the taste blend forced off vs on. Production goes through scoreCandidateWithLearning.
 export function scoreFromFeatures(
@@ -216,6 +221,7 @@ export function scoreFromFeatures(
   return clamp(Math.round(weighted * 100), 0, 100);
 }
 
+// Fallback score from profile fields only (no learned features or DB reads).
 function scoreProfileOnly(requester: UserDoc, candidate: UserDoc): number {
   const requesterProfile = requester.profile ?? {
     intent: 'explore' as const,
@@ -265,6 +271,7 @@ function scoreProfileOnly(requester: UserDoc, candidate: UserDoc): number {
   return clamp(Math.round(score * 100), 0, 100);
 }
 
+// Main entry point: loads both users' features + learned weights and returns their 0-100 match score.
 export async function scoreCandidateWithLearning(
   requester: UserDoc,
   candidate: UserDoc
@@ -279,6 +286,7 @@ export async function scoreCandidateWithLearning(
   return scoreFromFeatures(requesterFeatures, candidateFeatures, weights, globalUsableTasteUsers);
 }
 
+// Quick profile-only score, for when full feature extraction isn't warranted.
 export function scoreCandidateHeuristicML(requester: UserDoc, candidate: UserDoc): number {
   return scoreProfileOnly(requester, candidate);
 }

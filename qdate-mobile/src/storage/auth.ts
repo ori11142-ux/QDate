@@ -1,3 +1,5 @@
+// On-device storage of the signed-in user (AsyncStorage), so the app remembers
+// who is logged in between launches and can skip the login screen.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthMethod } from '../navigation/RootNavigator';
 import { IntentProfile, Phase } from '../types';
@@ -22,6 +24,7 @@ export interface StoredUser {
   registeredAt: string;
 }
 
+// Read the saved user, filling in defaults for any missing/older fields.
 export async function loadUser(): Promise<StoredUser | null> {
   try {
     const raw = await AsyncStorage.getItem(KEY);
@@ -55,10 +58,12 @@ export async function loadUser(): Promise<StoredUser | null> {
   }
 }
 
+// Persist the user to on-device storage.
 export async function saveUser(user: StoredUser): Promise<void> {
   await AsyncStorage.setItem(KEY, JSON.stringify(user));
 }
 
+// Forget the saved user (used on sign-out).
 export async function clearUser(): Promise<void> {
   await AsyncStorage.removeItem(KEY);
 }

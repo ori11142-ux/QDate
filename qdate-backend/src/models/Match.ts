@@ -1,3 +1,5 @@
+// Mongoose model for a Match: one server-generated pairing between two users,
+// tracking its lifecycle from pending_reveal through connected/expired.
 import { Schema, model, InferSchemaType, HydratedDocument } from 'mongoose';
 import { PHASES } from './User';
 

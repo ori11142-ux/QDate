@@ -1,3 +1,5 @@
+// The master list of interests users can pick at sign-up, plus a helper that keeps
+// only valid, de-duplicated picks. Each interest doubles as a matching-model axis.
 import { CalibrationTag } from '../ml/calibrationCards';
 
 // User-selectable interests. Each maps to a matching-model CalibrationTag axis,

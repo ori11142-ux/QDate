@@ -1,3 +1,5 @@
+// HomeScreen — the app's landing tab: a personal greeting, the user's current
+// phase, one daily tip, and a short statement of the QDate "slow dating" idea.
 import React from 'react';
 import {
   Image,
@@ -12,6 +14,7 @@ import { useAuth } from '../auth/AuthContext';
 import { getTodaysTip } from '../data/tips';
 import { colors, radius, spacing, typography } from '../theme';
 
+// The Home tab: greeting, today's single tip, and the app's guiding philosophy.
 export function HomeScreen() {
   const { user } = useAuth();
   // One tip per day — the same tip for the whole day, no cycling.

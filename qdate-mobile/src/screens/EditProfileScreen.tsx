@@ -1,3 +1,6 @@
+// EditProfileScreen — lets an existing user change their profile: name, age,
+// photos, bio, gender/attraction, age range, intent, comm style and interests.
+// Pre-fills every field from the current user and saves via updateProfile().
 import React, { useState } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
@@ -49,6 +52,7 @@ const ATTRACTION_OPTIONS: { value: Attraction; label: string }[] = [
   { value: 'both', label: 'Both' },
 ];
 
+// The edit-profile form: pre-filled from the current user, validated, then saved.
 export function EditProfileScreen({ navigation }: Props) {
   const { user, updateProfile } = useAuth();
   const insets = useSafeAreaInsets();
@@ -243,6 +247,7 @@ export function EditProfileScreen({ navigation }: Props) {
   );
 }
 
+// A reusable single-select pill row (one option highlighted at a time).
 function Chips<T extends string>({
   options,
   selected,

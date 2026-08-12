@@ -1,3 +1,4 @@
+// Shared UI: the app's standard pill-shaped button, reused across every screen.
 import React from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, ViewStyle } from 'react-native';
 import { colors, radius, spacing, typography } from '../theme';
@@ -11,6 +12,7 @@ interface Props {
   style?: ViewStyle;
 }
 
+// Renders a filled or outline button, showing a spinner while `loading`.
 export function PrimaryButton({
   title,
   onPress,

@@ -1,3 +1,6 @@
+// InsightsScreen — the "Reflection" tab. Pulls a summary from the backend and
+// shows the user what the matching system has learned: activity counts, match
+// outcomes, calibration signal, past reflections, and an overall intent score.
 import React, { useCallback, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
@@ -14,6 +17,7 @@ import { useAuth } from '../auth/AuthContext';
 import { InsightsSummary } from '../types';
 import { colors, radius, spacing, typography } from '../theme';
 
+// The Insights tab: fetches the learning summary and renders it as stat cards.
 export function InsightsScreen() {
   const { user } = useAuth();
   const [insights, setInsights] = useState<InsightsSummary | null>(null);
@@ -172,6 +176,7 @@ export function InsightsScreen() {
   );
 }
 
+// A small tile showing one big number with a label under it.
 function ActivityTile({ value, label }: { value: number; label: string }) {
   return (
     <View style={styles.activityTile}>
@@ -181,6 +186,7 @@ function ActivityTile({ value, label }: { value: number; label: string }) {
   );
 }
 
+// A labelled horizontal progress bar that fills to the given percentage.
 function StatBar({ label, pct }: { label: string; pct: number }) {
   return (
     <View style={styles.statBar}>

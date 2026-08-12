@@ -1,3 +1,5 @@
+// The draggable Tinder-style profile card used in Phase-1 swiping: handles the
+// drag gesture, tilt, LIKE/NOPE overlays, and the fling-away animation.
 import React, { useRef } from 'react';
 import {
   Animated,
@@ -22,6 +24,7 @@ interface Props {
   stackIndex?: number;
 }
 
+// One swipeable card; only the top card (stackIndex 0) reacts to drags, the rest sit behind it.
 export function SwipeCard({ children, onSwipeLeft, onSwipeRight, stackIndex = 0 }: Props) {
   const pan = useRef(new Animated.ValueXY()).current;
 

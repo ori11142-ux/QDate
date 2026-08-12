@@ -1,3 +1,6 @@
+// Behavioral-learning service: records post-match feedback and passive message
+// telemetry (length, reply latency), and nudges each user's intent score up or
+// down based on how they engage. This is the signal the ML ranker learns from.
 import { Types } from 'mongoose';
 import { FeedbackDoc, FeedbackModel } from '../models/Feedback';
 import { MessageEventDoc, MessageEventModel } from '../models/MessageEvent';

@@ -61,6 +61,8 @@ function orderUnseenFirst<T extends { id: string }>(cards: T[], seen: Set<string
   return [...unseen, ...already];
 }
 
+// Builds the "interests" deck: real, datable profiles shown as bio + interest tags
+// (no photo/name), unseen cards first.
 export async function getInterestCalibrationDeck(
   userId: string | Types.ObjectId
 ): Promise<InterestProfileCard[]> {
@@ -80,6 +82,8 @@ export async function getInterestCalibrationDeck(
   return orderUnseenFirst(cards, new Set(seen));
 }
 
+// Builds the "looks" deck: photos of datable profiles whose face was actually
+// recognized (no name/bio), unseen cards first.
 export async function getLookCalibrationDeck(
   userId: string | Types.ObjectId
 ): Promise<LookProfileCard[]> {

@@ -1,3 +1,5 @@
+// WelcomeScreen — the very first screen for logged-out users: the QDate brand,
+// a gently pulsing sparkle, and the two entry points (create account / log in).
 import React, { useEffect, useRef } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
@@ -15,6 +17,7 @@ import { colors, spacing, typography } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Welcome'>;
 
+// The landing screen: animated brand hero plus sign-up / log-in buttons.
 export function WelcomeScreen({ navigation }: Props) {
   const pulse = useRef(new Animated.Value(0)).current;
 
