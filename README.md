@@ -9,7 +9,7 @@ It runs a **two-phase lifecycle**:
 
 ---
 
-## Features
+## What it does
 
 - **One-at-a-time matching** with a two-sided **reciprocity gate** (you're only matched with someone who's also a strong match *for you*).
 - **Two-phase lifecycle** with countdown timers and skip cooldowns.
@@ -20,138 +20,72 @@ It runs a **two-phase lifecycle**:
 
 ---
 
+## Trying the app
+
+QDate is a real, installable **Android app** connected to a **hosted server** — there's nothing to run or set up on your computer.
+
+### 1. Install
+Install the **QDate** Android app on an Android phone:
+- Copy the provided **`qdate.apk`** to the phone and tap it (allow "install from unknown sources" if prompted), **or** open the install link supplied with the submission.
+
+### 2. Sign in
+The app is connected to a live server pre-loaded with demo profiles, so you can sign in and immediately see a populated experience.
+
+**To try Phase 2 (the curated weekly match)** — log in with a ready-made account (password **`qdate1234`** for all):
+
+| Email | Password |
+|---|---|
+| `p2_woman_0@qdate.test` | `qdate1234` |
+| `p2_man_4@qdate.test` | `qdate1234` |
+
+**To try Phase 1 (the 14-day daily-match learning phase)** — tap **Create account** and register a fresh user (new accounts always start in Phase 1 and go through onboarding).
+
+> The server runs on a free tier and "sleeps" when idle, so the **first** action after opening the app may take up to ~60 seconds while it wakes up. After that it's responsive.
+
+### 3. What to explore
+- **Today** — your single match with a countdown; reveal it, then open the chat or skip.
+- **Discover** — swipe on interests and faces to *train* your taste (this doesn't create matches).
+- **Chat** — message a match once you both connect.
+- **Insights** — your intent score and how the system is learning your preferences.
+- **Menu (☰)** — your full profile, edit profile, community guidelines, and sign out.
+- Compare **Phase 2** (the `p2_*` logins → one curated weekly match) with **Phase 1** (a fresh account → daily matches during the 14-day learning period).
+
+---
+
 ## Tech stack
 
-**Backend** (`qdate-backend/`)
-- Node.js + **Express** (TypeScript, run with `tsx`)
+**Backend**
+- Node.js + **Express** (TypeScript), hosted on Render
 - **MongoDB** via **Mongoose** (MongoDB Atlas)
 - **In-process ML in TypeScript** — a learned-weight compatibility ranker, plus a pretrained face-embedding pipeline (`@vladmandic/face-api` on **TensorFlow.js**) and a per-user visual-taste model
 - **bcrypt** email/password auth
 
-**Mobile** (`qdate-mobile/`)
-- **Expo** (SDK 54) + **React Native** (TypeScript) — one codebase for iOS & Android
-- **React Navigation** (stack + bottom tabs)
-- **AsyncStorage** for the persisted session
-- Built into a native **Android app** with **EAS Build**
+**Mobile**
+- **Expo** + **React Native** (TypeScript) — built into a native **Android app** with EAS Build
+- **React Navigation** (stack + bottom tabs), **AsyncStorage** for the session
 
 ---
 
-## Repository structure
+## Project structure
 
 ```
 QDate2/
 ├── qdate-backend/         # Node/Express + MongoDB API + ML
 │   └── src/
-│       ├── index.ts       # server entry point
 │       ├── routes/        # REST API endpoints
 │       ├── services/      # matchmaker, auth, calibration, moderation, …
 │       ├── ml/            # ranker, features, face embeddings, face taste
-│       ├── models/        # Mongoose schemas (User, Match, Swipe, …)
-│       └── scripts/       # seeding + dev tools
-├── qdate-mobile/          # Expo React Native app
-│   └── src/
-│       ├── screens/       # Welcome, Login, Register, DailyFocus, Discover, Chat, …
-│       ├── components/    # reusable UI
-│       ├── navigation/    # RootNavigator (auth-aware)
-│       ├── auth/          # AuthContext (logged-in state)
-│       └── api.ts         # single client for all backend calls
-├── DEPLOY.md              # how to host the backend + build the Android app
-└── README.md
+│       └── models/        # Mongoose schemas (User, Match, Swipe, …)
+└── qdate-mobile/          # React Native app
+    └── src/
+        ├── screens/       # Welcome, Login, DailyFocus, Discover, Chat, …
+        ├── navigation/    # RootNavigator (auth-aware)
+        ├── auth/          # AuthContext (logged-in state)
+        └── api.ts         # single client for all backend calls
 ```
 
 ---
 
-## Getting started
+## Note
 
-### Prerequisites
-- **Node.js 18+** and npm
-- A **MongoDB Atlas** account (free tier is fine) — you'll need a connection string
-- An **Android phone** to install the app (see **[DEPLOY.md](DEPLOY.md)** to build the APK)
-
-### 1. Backend
-
-```bash
-cd qdate-backend
-npm install
-```
-
-Create a `.env` file in `qdate-backend/` with your Atlas connection string:
-
-```
-MONGODB_URI=mongodb+srv://<user>:<password>@<cluster>.mongodb.net/qdate
-```
-
-> In MongoDB Atlas → **Network Access**, add your current IP address (or `0.0.0.0/0` for dev) so the server can connect.
-
-Start the API:
-
-```bash
-npm run dev
-```
-
-It listens on **http://localhost:5000**. Verify it's up: open **http://localhost:5000/api/health** → `{"ok":true}`.
-
-### 2. Android app
-
-The mobile client ships as a real, installable **Android app**. Build it with EAS and install the APK on your phone — the full walkthrough (hosting the backend, setting the URL, running the build) is in **[DEPLOY.md](DEPLOY.md)**. In short:
-
-```bash
-cd qdate-mobile
-npm install
-eas build -p android --profile preview   # → an installable .apk
-```
-
-The app reads its backend URL from `EXPO_PUBLIC_API_URL` in `eas.json`, so your backend must be **deployed** (reachable over the internet, not just `localhost`) and that URL set before you build. Download the finished APK and install it on your phone.
-
----
-
-## Test accounts & seed data
-
-From `qdate-backend/`, populate the database with test users (all share the password **`qdate1234`**):
-
-```bash
-npm run seed          # base seed users
-npm run seed:faces    # users with real faces (for the face-ML features)
-npm run seed:phase2   # 8 users already in Phase 2 (to test curated matching)
-```
-
-Handy dev tool — instantly move any user between phases (resets their state and generates a match):
-
-```bash
-npm run dev:phase -- <name-or-email> 2    # → Phase 2
-npm run dev:phase -- <name-or-email> 1    # → Phase 1
-```
-
-Example logins after seeding: `p2_woman_0@qdate.test` / `qdate1234` (Phase 2), or any `rface_*@qdate.test` / `qdate1234`.
-
----
-
-## Useful scripts
-
-**Backend** (`qdate-backend/`)
-| Command | What it does |
-|---|---|
-| `npm run dev` | Start the API with auto-reload (`tsx watch`) |
-| `npm run build` | Compile TypeScript → `dist/` |
-| `npm start` | Run the compiled server (`node dist/index.js`) |
-| `npm run seed` / `seed:faces` / `seed:phase2` | Seed test data |
-| `npm run dev:phase -- <user> <1\|2>` | Jump a user to a phase for testing |
-
-**Mobile** (`qdate-mobile/`)
-| Command | What it does |
-|---|---|
-| `eas build -p android --profile preview` | Build an installable Android APK |
-| `eas build -p android --profile production` | Build a Play-Store bundle (`.aab`) |
-
----
-
-## Building & hosting
-
-To ship the Android app you host the backend and build the APK with EAS. Full step-by-step instructions — hosting the backend on Render, configuring Atlas, and running the build — are in **[DEPLOY.md](DEPLOY.md)**.
-
----
-
-## Notes
-
-- **Face-recognition features are optional.** They're opt-in (biometric consent) and memory-heavy; if you don't need them the app matches on interests without them.
-- **Never commit real secrets** — keep your `MONGODB_URI` in `.env` (gitignored), not in the code.
+Face-recognition matching is **optional and opt-in** (biometric consent at sign-up). If a user declines, the app matches on interests and behavior instead — the face features simply don't run.
